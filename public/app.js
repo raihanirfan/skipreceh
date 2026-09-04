@@ -37,11 +37,20 @@ async function resolve(){
     const j=await r.json();
     const sec=((Date.now()-t0)/1000).toFixed(1)+"s";
     if(j.success){
-      finalUrl=j.resolved||j.url; setProgress(100,true);
-      setStatus("Bypass berhasil ("+sec+")","ok");
-      $("finalUrl").textContent=finalUrl; $("svc").textContent=svc; $("elapsed").textContent=sec+" • organic • "+(j.steps||1)+" steps";
-      const a=$("openLink"); a.href=finalUrl;
-      $("result").classList.add("show");
+      finalUrl=j.resolved||j.url;
+      // sfl.gl intermediate → auto headless to article
+      if(j.service==="sfl.gl"){
+        setStatus("SFL 1-hop: "+finalUrl.slice(0,70)+"… — lanjut headless…","loading"); setProgress(60,true);
+        $("finalUrl").textContent=finalUrl; $("svc").textContent="sfl.gl → headless…"; $("elapsed").textContent=sec; $("openLink").href=finalUrl; $("result").classList.add("show");
+        try{
+          const h=await fetch("https://skipreceh-browser.irfanraihanal.workers.dev/api/headless?url="+encodeURIComponent(finalUrl), {signal: AbortSignal.timeout(35000)});
+          const hj=await h.json();
+          if(hj.ok && hj.url){ finalUrl=hj.url; setProgress(100,true); setStatus("Headless berhasil","ok"); $("finalUrl").textContent=finalUrl; $("svc").textContent="sfl.gl (headless)"; $("elapsed").textContent=((Date.now()-t0)/1000).toFixed(1)+"s • browser"; $("openLink").href=finalUrl; $("openLink").textContent="Buka tujuan ↗"; }
+          else { setStatus(hj.error||"Headless: artikel tanpa file","err"); $("finalUrl").textContent=(hj.chain||[]).join(" → ")||hj.error||""; $("svc").textContent=hj.code||"no file"; $("elapsed").textContent="headless"; $("openLink").href="/skipreceh.user.js"; $("openLink").textContent="Install userscript →"; setProgress(0,false); }
+        }catch(eh){ setStatus("Headless error: "+(eh.message||eh),"err"); setProgress(0,false); }
+      } else {
+        setProgress(100,true); setStatus("Bypass berhasil ("+sec+")","ok"); $("finalUrl").textContent=finalUrl; $("svc").textContent=svc; $("elapsed").textContent=sec+" • organic • "+(j.steps||1)+" steps"; $("openLink").href=finalUrl; $("openLink").textContent="Buka tujuan ↗"; $("result").classList.add("show");
+      }
     } else {
       if(j.code==="NEEDS_BROWSER"){
         setStatus(j.error,"err");
