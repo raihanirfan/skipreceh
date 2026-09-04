@@ -43,7 +43,18 @@ async function resolve(){
       const a=$("openLink"); a.href=finalUrl;
       $("result").classList.add("show");
     } else {
-      setStatus(j.error||"Tidak ketemu pola — kemungkinan butuh userscript (klik/timer).","err");
+      if(j.code==="NEEDS_BROWSER"){
+        setStatus(j.error,"err");
+        // show hint + CTA in place of result
+        finalUrl=null;
+        $("finalUrl").textContent=j.hint||"";
+        $("svc").textContent="butuh browser";
+        $("elapsed").textContent="install userscript";
+        const a=$("openLink"); a.textContent="Install userscript →"; a.href="/skipreceh.user.js";
+        $("result").classList.add("show");
+      } else {
+        setStatus(j.error||"Tidak ketemu pola — kemungkinan butuh userscript (klik/timer).","err");
+      }
       setProgress(0,false);
     }
   }catch(e){ setStatus("Koneksi error: "+(e.message||e),"err"); setProgress(0,false); }

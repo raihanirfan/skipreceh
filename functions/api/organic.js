@@ -24,8 +24,8 @@ export async function onRequestPost({request}){
   const byParam=paramFrom(finalUrl);
   if(byParam) return json({success:true, resolved: byParam, url: byParam, service:"param", steps:1});
 
-  // no match → hint userscript (needs DOM)
-  return json({success:false, error:"tidak ketemu pola — kemungkinan butuh klik/timer JS. Pakai userscript."});
+  // no match → butuh browser asli
+  return json({success:false, error:"Link ini butuh klik/timer di browser — server tidak bisa bypass.", code:"NEEDS_BROWSER", hint:"Install userscript lalu buka link aslinya, bypass jalan otomatis."});
 }
 export async function onRequestGet({request}){
   const url=(new URL(request.url).searchParams.get("url")||"").trim();
