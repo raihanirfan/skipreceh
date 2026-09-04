@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkipReceh — bypass shortlink receh</title>
+<meta name="description" content="Lewati shortlink & safelink receh — langsung ke tujuan.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--pri:#5b6cf0;--pri2:#3e52e6;--ok:#16a34a;--err:#dc2626;--radius:16px}
+*{box-sizing:border-box}html,body{margin:0}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;flex-direction:column}
+a{color:var(--pri)}
+.nav{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--line)}
+.nav-inner{max-width:1080px;margin:0 auto;padding:14px 20px;display:flex;justify-content:space-between;align-items:center}
+.brand{font-weight:800;letter-spacing:-.02em;text-decoration:none;color:var(--ink);font-size:1.05rem}
+.brand span{color:var(--pri)}
+.nav-links a{font-size:.9rem;text-decoration:none;color:var(--muted);margin-left:18px}
+.nav-links a:hover{color:var(--ink)}
+.wrap{max-width:760px;margin:0 auto;padding:28px 20px 40px;width:100%}
+.hero{text-align:center;padding:28px 0 18px}
+.hero h1{font-size:clamp(1.9rem,5vw,2.6rem);line-height:1.05;letter-spacing:-.03em;margin:0}
+.hero h1 em{color:var(--pri);font-style:normal}
+.changing{color:var(--pri)}
+.hero p{color:var(--muted);margin:10px 0 0;font-size:1rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.input{flex:1;min-width:220px;padding:14px 14px;border:1px solid var(--line);border-radius:12px;font-size:1rem;outline:none;background:#fff;color:var(--ink)}
+.input:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(91,108,240,.15)}
+.btn{padding:14px 18px;border:0;border-radius:12px;background:var(--pri);color:#fff;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--pri2)}.btn:disabled{opacity:.6;cursor:not-allowed}
+.btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.badge{display:inline-flex;align-items:center;gap:6px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:999px;padding:6px 10px;font-size:.8rem;font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;background:#22c55e}
+.muted{color:var(--muted);font-size:.88rem}
+.status{margin-top:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);font-size:.92rem;display:none}
+.status.show{display:block}
+.status.ok{background:#f0fdf4;border-color:#bbf7d0;color:#14532d}
+.status.err{background:#fef2f2;border-color:#fecaca;color:#7f1d1d}
+.status.loading{background:#eef2ff;border-color:#c7d2fe}
+.progress{height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-top:10px;display:none}
+.progress.show{display:block}.fill{height:100%;width:0;background:var(--pri);transition:width .3s}
+.result{margin-top:14px;display:none}
+.result.show{display:block}
+.url{word-break:break-all;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-family:ui-monospace,Menlo,monospace;font-size:.92rem}
+.tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.tag{font-size:.78rem;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--muted)}
+.foot{text-align:center;margin-top:26px}
+.foot a{font-size:.8rem;color:var(--muted);text-decoration:none}
+.foot a:hover{color:var(--ink)}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="/">Skip<span>Receh</span></a>
+    <div class="nav-links">
+      <a href="/skipreceh.user.js">Userscript</a>
+      <a href="https://github.com/adsbypasser/adsbypasser" target="_blank" rel="noopener">Adsbypasser</a>
+    </div>
+  </div>
+</nav>
+<div class="wrap">
+  <header class="hero">
+    <h1><span class="changing" id="changingText">ouo.io</span> bypasser</h1>
+    <p>Tempel link shortlink/safelink — langsung ke tujuan. Mode <b>organic</b> (dispatcher ala adsbypasser).</p>
+  </header>
+  <div class="card">
+    <div class="row">
+      <input id="urlInput" class="input" type="url" placeholder="https://ouo.io/xxxx  atau  https://safelink/..." autofocus>
+      <button id="goBtn" class="btn" onclick="resolve()">Bypass</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('urlInput').value='';document.getElementById('urlInput').focus()">Clear</button>
+    </div>
+    <div id="detected" class="muted" style="margin-top:10px;display:none"><span class="badge"><span class="dot"></span><span id="detectedName">—</span></span> <span id="mode">organic</span></div>
+    <div id="status" class="status"></div>
+    <div id="progress" class="progress"><div id="fill" class="fill"></div></div>
+    <div id="result" class="result">
+      <div class="muted" style="margin-bottom:8px;color:var(--ok);font-weight:700">✓ URL ditemukan</div>
+      <div id="finalUrl" class="url"></div>
+      <div class="tags"><span id="svc" class="tag"></span><span class="tag" id="elapsed"></span></div>
+      <div class="row" style="margin-top:12px">
+        <a id="openLink" href="#" target="_blank" rel="noopener" class="btn" style="text-decoration:none;display:inline-flex;align-items:center">Buka tujuan ↗</a>
+        <button class="btn btn-ghost" onclick="copyResult()">Copy</button>
+        <button class="btn btn-ghost" onclick="resetResult()">Bypass lagi</button>
+      </div>
+    </div>
+    <div class="muted" id="hint" style="margin-top:12px">Gagal via server? Target butuh klik/timer → pakai <a href="/skipreceh.user.js">userscript</a>.</div>
+  </div>
+  <div class="foot">
+    <a href="https://greasyfork.org/scripts/431691" target="_blank" rel="noopener">ref: bypass all shortlinks 431691</a> · <a href="https://github.com/adsbypasser/adsbypasser" target="_blank" rel="noopener">adsbypasser</a>
+  </div>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
