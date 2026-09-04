@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.1
+// @version      0.2.2
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -41,18 +41,23 @@
     return m?m[0]:null;
   }
 
-  // sfl.gl is handled synchronously at document-start (before DOMContentLoaded 10ms timer)
-  if(/sfl\.gl/i.test(location.hostname) || /sfl\.gl/i.test(location.href)){
-    // form exists in raw HTML even before DOM ready — poll 5x20ms then submit
-    let tries=0;
-    const iv=setInterval(()=>{
-      const f=document.getElementById('form') || document.querySelector('form[action*="khaddavi"]');
-      if(f){ clearInterval(iv); f.submit(); }
-      if(++tries>10) clearInterval(iv);
-    }, 20);
-    // fallback: if form not found, follow meta
-    const m=document.documentElement.innerHTML.match(/https?:\/\/app\.khaddavi\.net\/redirect\.php[^\s"'<>]+/i);
-    if(m) setTimeout(()=>location.replace(m[0]), 50);
+  // sfl.gl — submit sebelum timer 10ms milik sfl
+  if(/sfl\.gl/i.test(location.hostname)){
+    const trySubmit=()=>{
+      const f=document.getElementById('form')||document.querySelector('form[action*="khaddavi"]');
+      if(f){ try{ f.submit(); }catch{} return true; }
+      return false;
+    };
+    // 1) langsung kalau form sudah ada (rare)
+    if(!trySubmit()){
+      // 2) DOMContentLoaded datang duluan dari sfl — kita daftar lebih awal (document-start), jadi fire sebelum setTimeout 10ms
+      document.addEventListener('DOMContentLoaded', ()=>{ trySubmit(); });
+      // 3) MutationObserver untuk form yang muncul setelah head parse
+      const obs=new MutationObserver(()=>{ if(trySubmit()) try{obs.disconnect();}catch{} });
+      // documentElement ada di document-start
+      try{ obs.observe(document.documentElement,{childList:true,subtree:true}); }catch{}
+      setTimeout(()=>{ try{obs.disconnect();}catch{} }, 5000);
+    }
   }
 
   const RULES=[];
@@ -77,8 +82,7 @@
   }});
 
   function run(){
-    // skip sfl.gl — already handled above
-    if(/sfl\.gl/i.test(location.href)) return;
+    if(/sfl\.gl/i.test(location.hostname)) return; // sudah handled di atas
     const h=findHandler();
     if(h && typeof h.start==="function") try{ h.start(); }catch{}
   }
