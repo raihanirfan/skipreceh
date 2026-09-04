@@ -36,6 +36,26 @@ export function paramFrom(finalUrl){
   }catch{}
   return null;
 }
+export function formAutoUrl(html, base){
+  const fm=html.match(/<form[^>]+action=["']([^"']+)["'][^>]*>/i);
+  if(!fm) return null;
+  let action=fm[1].trim();
+  try{ action=new URL(action, new URL(base)).toString(); }catch{}
+  // collect hidden inputs robustly (order-agnostic)
+  const tags=[...html.matchAll(/<input[^>]*>/gi)].map(t=>t[0]);
+  const pairs=[];
+  for(const tag of tags){
+    const n=tag.match(/\bname=["']([^"']+)["']/i);
+    const v=tag.match(/\bvalue=["']([^"']*)["']/i);
+    if(n) pairs.push([n[1], v?v[1]:""]);
+  }
+  if(!pairs.length) return null;
+  try{
+    const u=new URL(action);
+    for(const [k,v] of pairs) if(k) u.searchParams.set(k,v);
+    return u.searchParams.toString() ? u.toString() : null;
+  }catch{ return null; }
+}
 // dispatcher: rule registry
 export const RULES=[];
 export function register(rule){ RULES.push(rule); }

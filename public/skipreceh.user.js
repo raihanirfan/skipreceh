@@ -55,6 +55,12 @@
   function findHandler(){ for(const r of RULES) if(matchRule(r.rule)) return r; return null; }
 
   // rules
+  register({ rule: /sfl\.gl/i, start(){
+    const form=document.querySelector('form[action*="khaddavi"]') || document.querySelector('form#form');
+    if(form){ form.submit(); return; }
+    const a=document.querySelector('a[href*="khaddavi"]');
+    if(a) location.replace(a.href);
+  }});
   register({ rule: /adf\.ly|adfoc\.us|ay\.gy|j\.gs|q\.gs|tinyical|uii\.io/i, start(){ const u=ysmmFrom(document.documentElement.innerHTML); if(u) location.replace(u); } });
   register({ rule: /safelink/i, start(){ const u=paramFrom(); if(u) location.replace(u); } });
   // generic fallback last (match all)

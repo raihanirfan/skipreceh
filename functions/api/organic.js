@@ -1,4 +1,4 @@
-import { UA, isPrivate, isHttp, json, ysmmFrom, metaRefreshFrom, paramFrom } from "../_shared/extractors.js";
+import { UA, isPrivate, isHttp, json, ysmmFrom, metaRefreshFrom, paramFrom, formAutoUrl } from "../_shared/extractors.js";
 
 export async function onRequestPost({request}){
   let body; try{ body=await request.json(); }catch{ return json({success:false, error:"json"},400); }
@@ -23,6 +23,10 @@ export async function onRequestPost({request}){
   if(byMeta) return json({success:true, resolved: byMeta, url: byMeta, service:"meta-refresh", steps:2});
   const byParam=paramFrom(finalUrl);
   if(byParam) return json({success:true, resolved: byParam, url: byParam, service:"param", steps:1});
+
+  // sfl.gl-style: form auto-submit (khaddavi)
+  const byForm=formAutoUrl(html, finalUrl);
+  if(byForm) return json({success:true, resolved: byForm, url: byForm, service:"sfl.gl", steps:2});
 
   // no match → butuh browser asli
   return json({success:false, error:"Link ini butuh klik/timer di browser — server tidak bisa bypass.", code:"NEEDS_BROWSER", hint:"Install userscript lalu buka link aslinya, bypass jalan otomatis."});
