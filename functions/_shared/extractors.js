@@ -1,4 +1,4 @@
-const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36";
+export const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36";
 const HTTP = /^https?:\/\//i;
 export const SAFE_PARAMS = new Set(["url","u","link","go","site","r","target","safelink_redirect","dst","href","s"]);
 
