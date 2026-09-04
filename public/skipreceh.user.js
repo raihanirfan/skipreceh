@@ -1,17 +1,16 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.0
+// @version      0.2.1
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
 // @match        *://*/*
-// @run-at       document-end
+// @run-at       document-start
 // @grant        none
 // ==/UserScript==
 (function(){
   'use strict';
-  // ponytail: minimal dispatcher — register(rule) + findHandler, no external deps
   const HTTP=/^https?:\/\//i;
   function b64(s){ try{ return atob(s.replace(/-/g,'+').replace(/_/g,'/')) }catch{ return null; } }
   function toUrl(v){
@@ -42,7 +41,20 @@
     return m?m[0]:null;
   }
 
-  // dispatcher
+  // sfl.gl is handled synchronously at document-start (before DOMContentLoaded 10ms timer)
+  if(/sfl\.gl/i.test(location.hostname) || /sfl\.gl/i.test(location.href)){
+    // form exists in raw HTML even before DOM ready — poll 5x20ms then submit
+    let tries=0;
+    const iv=setInterval(()=>{
+      const f=document.getElementById('form') || document.querySelector('form[action*="khaddavi"]');
+      if(f){ clearInterval(iv); f.submit(); }
+      if(++tries>10) clearInterval(iv);
+    }, 20);
+    // fallback: if form not found, follow meta
+    const m=document.documentElement.innerHTML.match(/https?:\/\/app\.khaddavi\.net\/redirect\.php[^\s"'<>]+/i);
+    if(m) setTimeout(()=>location.replace(m[0]), 50);
+  }
+
   const RULES=[];
   function register(rule){ RULES.push(rule); }
   function matchRule(rule){
@@ -54,16 +66,8 @@
   }
   function findHandler(){ for(const r of RULES) if(matchRule(r.rule)) return r; return null; }
 
-  // rules
-  register({ rule: /sfl\.gl/i, start(){
-    const form=document.querySelector('form[action*="khaddavi"]') || document.querySelector('form#form');
-    if(form){ form.submit(); return; }
-    const a=document.querySelector('a[href*="khaddavi"]');
-    if(a) location.replace(a.href);
-  }});
   register({ rule: /adf\.ly|adfoc\.us|ay\.gy|j\.gs|q\.gs|tinyical|uii\.io/i, start(){ const u=ysmmFrom(document.documentElement.innerHTML); if(u) location.replace(u); } });
   register({ rule: /safelink/i, start(){ const u=paramFrom(); if(u) location.replace(u); } });
-  // generic fallback last (match all)
   register({ rule: /./, start(){
     const u=ysmmFrom(document.documentElement.innerHTML) || paramFrom();
     if(!u) return;
@@ -72,6 +76,12 @@
     location.replace(u);
   }});
 
-  const h=findHandler();
-  if(h && typeof h.start==="function") try{ h.start(); }catch{}
+  function run(){
+    // skip sfl.gl — already handled above
+    if(/sfl\.gl/i.test(location.href)) return;
+    const h=findHandler();
+    if(h && typeof h.start==="function") try{ h.start(); }catch{}
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", run);
+  else run();
 })();
