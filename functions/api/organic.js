@@ -16,7 +16,7 @@ export async function onRequestPost({request}){
   const html=(await res.text()).slice(0,300000);
   const finalUrl=res.url || src;
 
-  // adsbypasser-style priority: ysmm > meta > param (generic fallback)
+  // priority: ysmm > meta > param
   const byYsmm=ysmmFrom(html);
   if(byYsmm) return json({success:true, resolved: byYsmm, url: byYsmm, service:"adf.ly", steps:2});
   const byMeta=metaRefreshFrom(html);
@@ -24,7 +24,7 @@ export async function onRequestPost({request}){
   const byParam=paramFrom(finalUrl);
   if(byParam) return json({success:true, resolved: byParam, url: byParam, service:"param", steps:1});
 
-  // no match → hint userscript (adsbypasser ready handler would need DOM)
+  // no match → hint userscript (needs DOM)
   return json({success:false, error:"tidak ketemu pola — kemungkinan butuh klik/timer JS. Pakai userscript."});
 }
 export async function onRequestGet({request}){

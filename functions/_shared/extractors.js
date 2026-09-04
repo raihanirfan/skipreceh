@@ -36,7 +36,7 @@ export function paramFrom(finalUrl){
   }catch{}
   return null;
 }
-// adsbypasser-inspired dispatcher: rule registry
+// dispatcher: rule registry
 export const RULES=[];
 export function register(rule){ RULES.push(rule); }
 export function detect(htmlOrUrl, finalUrl){

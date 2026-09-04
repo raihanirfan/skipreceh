@@ -2,7 +2,7 @@
 // @name         SkipReceh
 // @namespace    skipreceh
 // @version      0.2.0
-// @description  Lewati shortlink & safelink receh — dispatcher ala adsbypasser, fallback generic.
+// @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
 // @match        *://*/*
@@ -42,7 +42,7 @@
     return m?m[0]:null;
   }
 
-  // dispatcher ala adsbypasser
+  // dispatcher
   const RULES=[];
   function register(rule){ RULES.push(rule); }
   function matchRule(rule){
