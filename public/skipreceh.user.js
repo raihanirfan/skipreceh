@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.27
+// @version      0.2.28
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -70,15 +70,40 @@
     }
   }
 
-  // tpi.li / shrinkearn — 15s counter + Turnstile (shrinkearn template) — auto klik Get Link/Skip Ad setelah countdown
+  // tpi.li / shrinkearn — 15s counter + Turnstile + anti-adblock spoof
   if(/tpi\.li|shrinkearn\.com/i.test(location.hostname)){
-    function tryTpi(){
-      // hide anti-adblock overlay
+    // anti-adblock: spoof .banner.banner-captcha/.banner-inner so site doesn't replace #link-view
+    function spoofTpi(){
       try{
-        for(const el of document.querySelectorAll('[class*="adblock"],[id*="adblock"]')){
-          if(el.offsetParent!==null) el.style.display='none';
+        if(!document.querySelector('.banner.banner-captcha')){
+          const b=document.createElement('div'); b.className='banner banner-captcha'; b.style.cssText='height:100px;display:block;position:absolute;left:-9999px';
+          const inner=document.createElement('div'); inner.className='banner-inner'; inner.style.cssText='width:300px;height:100px;display:block';
+          b.appendChild(inner); (document.body||document.documentElement).appendChild(b);
         }
+        if(!document.querySelector('.banner-inner')){
+          const bi=document.createElement('div'); bi.className='banner-inner'; bi.style.cssText='width:300px;height:100px;display:block;position:absolute;left:-9999px';
+          (document.body||document.documentElement).appendChild(bi);
+        }
+        const lv=document.querySelector('#link-view'); if(lv) lv.style.display='';
+        const box=document.querySelector('.box-main .row'); if(box) box.style.display='';
+        const adb=document.getElementById('adb_detected'); if(adb) adb.remove();
+        for(const el of document.querySelectorAll('.alert.alert-danger')){ if(/Adblock/i.test(el.textContent)) el.remove(); }
       }catch{}
+    }
+    spoofTpi();
+    try{
+      const oH=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'offsetHeight');
+      const cH=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'clientHeight');
+      const cW=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'clientWidth');
+      const isBan=e=>e&&e.classList&&(e.classList.contains('banner-captcha')||e.classList.contains('banner-inner')||e.classList.contains('ad-banner'));
+      if(oH) Object.defineProperty(HTMLElement.prototype,'offsetHeight',{get(){ if(isBan(this)) return 100; return oH.get.call(this); },configurable:true});
+      if(cH) Object.defineProperty(HTMLElement.prototype,'clientHeight',{get(){ if(isBan(this)) return 100; return cH.get.call(this); },configurable:true});
+      if(cW) Object.defineProperty(HTMLElement.prototype,'clientWidth',{get(){ if(isBan(this)) return 300; return cW.get.call(this); },configurable:true});
+    }catch{}
+    document.addEventListener('DOMContentLoaded', spoofTpi);
+    setInterval(spoofTpi, 1000);
+    function tryTpi(){
+      spoofTpi();
       const btns=[...document.querySelectorAll('a,button')];
       const btn=btns.find(b=>{
         const tx=(b.innerText||b.textContent||'').trim();
