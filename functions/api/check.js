@@ -7,7 +7,7 @@ const MAP=[
   {re:/shorte\.st|sh\.st/i, name:"Shorte.st"},
   {re:/linkvertise|link-to\.net/i, name:"Linkvertise"},
   {re:/work\.ink|bstlar\.com|lootlinks|loot-link|cuty\.io|paster\.so/i, name:"AdLink"},
-  {re:/bit\.ly|cutt\.ly|rebrand\.ly|shorter\.me|t\.co|t\.ly|tiny\.cc|tinylink\.onl|tinyurl\.com|shorturl\.at|6x\.work|v\.gd/i, name:"Shortener"},
+  {re:/bit\.ly|cutt\.ly|rebrand\.ly|shorter\.me|t\.ly|tiny\.cc|tinylink\.onl|tinyurl\.com|shorturl\.at|6x\.work|v\.gd/i, name:"Shortener"},
 ];
 export async function onRequestPost({request}){
   let body; try{ body=await request.json(); }catch{ return json({valid:false, error:"json"},400); }
