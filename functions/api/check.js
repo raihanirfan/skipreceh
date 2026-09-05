@@ -6,7 +6,7 @@ const MAP=[
   {re:/safelink/i, name:"Safelink"},
   {re:/shorte\.st|sh\.st/i, name:"Shorte.st"},
   {re:/linkvertise/i, name:"Linkvertise"},
-  {re:/bit\.ly|tinyurl\.com|t\.co|is\.gd|cutt\.ly/i, name:"Shortener"},
+  {re:/bit\.ly|cl\.gy|cutt\.ly|goo\.gl|is\.gd|rebrand\.ly|rkns\.link|shorter\.me|t\.co|t\.ly|tiny\.cc|tinylink\.onl|tinyurl\.com|shorturl\.at|6x\.work|v\.gd/i, name:"Shortener"},
 ];
 export async function onRequestPost({request}){
   let body; try{ body=await request.json(); }catch{ return json({valid:false, error:"json"},400); }
