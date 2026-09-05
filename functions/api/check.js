@@ -10,7 +10,7 @@ const MAP=[
 ];
 export async function onRequestPost({request}){
   let body; try{ body=await request.json(); }catch{ return json({valid:false, error:"json"},400); }
-  const url=(body.url|"").trim();
+  const url=(body.url||"").trim();
   if(!isHttp(url)) return json({valid:false, error:"url harus http(s)"});
   let host; try{ host=new URL(url).hostname; }catch{ return json({valid:false}); }
   if(isPrivate(host)) return json({valid:false, error:"host ditolak"});
@@ -18,6 +18,6 @@ export async function onRequestPost({request}){
   return json({valid:true, service:"Generic"});
 }
 export async function onRequestGet({request}){
-  const url=(new URL(request.url).searchParams.get("url")|"").trim();
+  const url=(new URL(request.url).searchParams.get("url")||"").trim();
   return onRequestPost({request: new Request(request.url, {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({url})})});
 }

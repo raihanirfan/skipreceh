@@ -25,7 +25,7 @@ async function resolve(){
   let svc="Generic";
   try{
     const r=await fetch("/api/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url})});
-    const d=await r.json();
+    const txt0=await r.text(); let d; try{ d=JSON.parse(txt0); }catch{ throw new Error(txt0.includes("<!DOCTYPE")||txt0.includes("<html") ? "Server diblokir challenge (Cf) — pakai userscript buka link langsung" : (txt0.slice(0,120)||"check gagal")); }
     if(!d.valid) throw new Error(d.error||"URL tidak valid");
     svc=d.service||"Generic";
     const det=$("detected"); if(det){ det.style.display=""; $("detectedName").textContent=svc; }
