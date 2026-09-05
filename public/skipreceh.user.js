@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.19
-// @description  Lewati shortlink & safelink receh.
+// @version      0.2.20
+// @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
 // @updateURL    https://skipreceh.pages.dev/skipreceh.user.js
@@ -32,7 +32,7 @@
     const u=d&&d.match(/https?:\/\/[^\s"'\\<>]+/i);
     return u?u[0]:null;
   }
-  const SAFE=new Set(["url","u","link","go","site","r","target","safelink_redirect","dst","href","s"]);
+  const SAFE=new Set(["url","u","link","go","site","r","target","dst","href","s"]);
   function paramFrom(){
     const u=new URL(location.href);
     const bags=[u.searchParams];
@@ -41,21 +41,6 @@
     for(const q of bags) for(const [k,v] of q) if(SAFE.has(k)){ const t=toUrl(v); if(t) return t; }
     const m=document.documentElement.innerHTML.match(/https?:\/\/[^\s"'<>]+\.(?:mp4|pdf|zip)/i);
     return m?m[0]:null;
-  }
-
-  // sfl.gl — submit sebelum timer 10ms milik sfl
-  if(/sfl\.gl/i.test(location.hostname)){
-    const trySubmit=()=>{
-      const f=document.getElementById('form')||document.querySelector('form[action*="khaddavi"]');
-      if(f){ try{ f.submit(); }catch{} return true; }
-      return false;
-    };
-    if(!trySubmit()){
-      document.addEventListener('DOMContentLoaded', ()=>{ trySubmit(); });
-      const obs=new MutationObserver(()=>{ if(trySubmit()) try{obs.disconnect();}catch{} });
-      try{ obs.observe(document.documentElement,{childList:true,subtree:true}); }catch{}
-      setTimeout(()=>{ try{obs.disconnect();}catch{} }, 5000);
-    }
   }
 
   // ouo.io/ouo.press — auto click "I'm a human" after 2.5s enable + follow /go
@@ -273,8 +258,6 @@
     const p=paramFrom(); if(p) location.replace(p);
   }});
   register({ rule: /adf\.ly|adfoc\.us|ay\.gy|j\.gs|q\.gs|tinyical|uii\.io/i, start(){ const u=ysmmFrom(document.documentElement.innerHTML); if(u) location.replace(u); } });
-  // safelink generic
-  register({ rule: /safelink/i, start(){ const u=paramFrom(); if(u) location.replace(u); } });
   // work.ink: stealth — delay hook 1.2s + masquerade toString agar tidak kedetect Extension, retry ws crowd
   register({ rule: /work\.ink/i, start(){
     if(location.pathname==='/' ) return;
@@ -311,7 +294,6 @@
   }});
 
   function run(){
-    if(/sfl\.gl/i.test(location.hostname)) return;
     if(/linkvertise\.com|link-to\.net/i.test(location.hostname)) return;
     const h=findHandler();
     if(h && typeof h.start==="function") try{ h.start(); }catch{}

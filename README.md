@@ -1,6 +1,6 @@
 # SkipReceh
 
-Lewati shortlink & safelink receh. Dua jalur bypass, satu repo, deploy ke Cloudflare Pages (gratis).
+Lewati shortlink receh. Dua jalur bypass, satu repo, deploy ke Cloudflare Pages (gratis).
 
 ```
 public/
@@ -42,7 +42,7 @@ Buka `public/skipreceh.user.js`, tambah satu objek ke array `RULES`:
 
 ```js
 {
-  test: /domain-safelink\.com/i,          // cocokkan host/path
+  test: /example-shortlink\.com/i,          // cocokkan host/path
   run (doc) {                              // doc = document halaman
     const m = doc.querySelector('a.final').href;
     return m || null;                      // null = menyerah, biarkan
@@ -65,7 +65,7 @@ Rule server-side ada di `functions/api/bypass.js` (extractor: `ysmm`, meta refre
 
 1. **Deploy:** `npx wrangler login && npm run deploy` → live di `https://skipreceh.pages.dev`.
 2. **Publish ke [GreasyFork](https://greasyfork.org/en/script/new)** (login dulu) — kanal distribusi userscript terbesar; paste isi `skipreceh.user.js`. Salinan GreasyFork dipakai sendiri untuk update user, jadi **bump `@version` tiap ada perubahan** dan tetap upload versi terbaru ke Pages supaya dua-duanya sinkron.
-3. **Sebar manual:** link + cara pakai 1 kalimat ke grup Telegram/Discord/Reddit tempat safelink receh sering muncul.
+3. **Sebar manual:** link + cara pakai 1 kalimat ke grup Telegram/Discord/Reddit tempat shortlink receh sering muncul.
 
 Ingin lihat seberapa ramai? Aktifkan **Cloudflare Web Analytics** (gratis, tanpa cookie) di dashboard Pages → tambah satu tag `<script>` ke `index.html`.
 

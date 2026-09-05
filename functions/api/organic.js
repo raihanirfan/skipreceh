@@ -28,9 +28,6 @@ export async function onRequestPost({request}){
   // shorteners: pure 301/302 — res.url is final after fetch follow
   if(isShortener(host) && finalUrl !== src && isHttp(finalUrl)) return json({success:true, resolved: finalUrl, url: finalUrl, service:"shortener", steps:1});
 
-  // sfl.gl-style: form auto-submit (khaddavi)
-  const byForm=formAutoUrl(html, finalUrl);
-  if(byForm) return json({success:true, resolved: byForm, url: byForm, service:"sfl.gl", steps:2});
 
   // generic follow fallback: any 301 chain resolved by fetch
   if(finalUrl !== src && isHttp(finalUrl)) return json({success:true, resolved: finalUrl, url: finalUrl, service:"redirect", steps:1});

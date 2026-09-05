@@ -3,7 +3,6 @@ import { isPrivate, isHttp, json } from "../_shared/extractors.js";
 const MAP=[
   {re:/adf\.ly|adfoc\.us|ay\.gy|j\.gs|q\.gs|tinyical\.com|uii\.io/i, name:"Adf.ly"},
   {re:/ouo\.io|ouo\.press/i, name:"Ouo.io"},
-  {re:/safelink/i, name:"Safelink"},
   {re:/shorte\.st|sh\.st/i, name:"Shorte.st"},
   {re:/linkvertise|link-to\.net/i, name:"Linkvertise"},
   {re:/work\.ink|bstlar\.com|lootlinks|loot-link|paster\.so/i, name:"AdLink"},

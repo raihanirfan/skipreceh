@@ -1,6 +1,6 @@
 let finalUrl=null;
 const $=id=>document.getElementById(id);
-const words=["ouo.io","adf.ly","safelink","linkvertise","shortest","bit.ly","tinyurl","cutt.ly"];
+const words=["ouo.io","adf.ly","linkvertise","shortest","bit.ly","tinyurl","cutt.ly"];
 let wi=0;
 setInterval(()=>{ const e=$("changingText"); if(e) e.textContent=words[wi++%words.length]; }, 2500);
 function setStatus(msg, kind=""){
@@ -39,13 +39,9 @@ async function resolve(){
     if(j.success){
       finalUrl=j.resolved||j.url; setProgress(100,true);
       setStatus("Bypass berhasil ("+sec+")","ok");
-      // ponytail: sfl.gl adalah 1-hop ke redirect.php (artikel khaddavi), bukan file — jangan auto-headless (hemat 10min/hari browser). Headless on-demand via skipreceh-browser jika perlu.
-      if(j.service==="sfl.gl"){
-        setStatus("SFL → artikel (bukan file) — buka manual atau pakai userscript","ok");
-        $("svc").textContent="sfl.gl";
-      } else $("svc").textContent=svc;
+      $("svc").textContent=svc;
       $("finalUrl").textContent=finalUrl; $("elapsed").textContent=sec+" • organic • "+(j.steps||1)+" steps";
-      const a=$("openLink"); a.href=finalUrl; a.textContent=j.service==="sfl.gl"?"Buka artikel ↗":"Buka tujuan ↗";
+      const a=$("openLink"); a.href=finalUrl; a.textContent="Buka tujuan ↗";
       $("result").classList.add("show");
     } else {
       if(j.code==="NEEDS_BROWSER"){
