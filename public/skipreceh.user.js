@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.16
+// @version      0.2.17
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -109,11 +109,21 @@
     }
   }
 
-  // cuty.io/cuttty.com — auto click Continue (submit-button) after interstitial
+  // cuty.io/cuttty.com — auto click Continue (submit-button) after interstitial + vhit enable
   if(/cuty\.io|cuttty\.com/i.test(location.hostname)){
-    const tryCuty=()=>{ const b=document.getElementById('submit-button'); if(b && b.offsetParent!==null){ try{ b.click(); return true; }catch{} } const alt=[...document.querySelectorAll('button')].find(x=>x.innerText.trim().toLowerCase()==='continue'); if(alt){ try{ alt.click(); return true;}catch{} } return false; };
-    let c=0; const iv=setInterval(()=>{ if(tryCuty()||c++>20) clearInterval(iv); }, 800);
+    const tryCuty=()=>{
+      const b=document.getElementById('submit-button');
+      // only click when actually enabled — disabled click is no-op and prematurely clears interval (ponytail bug 0.2.16)
+      if(b && b.offsetParent!==null && !b.disabled && b.innerText.trim().toLowerCase()!=='please wait ...'){
+        try{ b.click(); return true; }catch{}
+      }
+      const alt=[...document.querySelectorAll('button')].find(x=>x.innerText.trim().toLowerCase()==='continue');
+      if(alt && alt.offsetParent!==null && !alt.disabled){ try{ alt.click(); return true; }catch{} }
+      return false;
+    };
+    let c=0; const iv=setInterval(()=>{ if(tryCuty()||c++>26) clearInterval(iv); }, 800);
     setTimeout(tryCuty, 3500);
+    setTimeout(tryCuty, 6000);
   }
 
   // ouo.io/ouo.press — auto click "I'm a human" after 2.5s enable + follow /go
