@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.36
+// @version      0.2.37
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -28,40 +28,98 @@
       };
     }catch{}
   }catch{}
-  // ponytail: generic CHP Ads Blocker killer (financeehelp.com etc) — overlay z 2147483647 random id + text "Ads Blocker Detected"
-  // Helium reports no adblock but modal still shows — kill by text + fixed high-z, restore scroll
+  // ponytail: CHP Ads Blocker preempt+kill (financeehelp.com etc) — fake adsbygoogle + bait offsetHeight + block znro class + text fallback
   (function(){
+    const ZNRO='znrozeohzeoxncqteqklkvkd_cnxjtcestfjovyaujwdftehod';
+    const BODYCLS='ndhvdcraxpnvlratszelbtiu_ktlvybnvlnvfdmnjdlnqrrmd';
+    try{
+      // 1) fake adsbygoogle before site checks (adsBlocked)
+      const fakeAds={push(){}, loaded:true};
+      try{ Object.defineProperty(window,'adsbygoogle',{get(){return window._adsFake||fakeAds;},set(v){window._adsFake=v;},configurable:true}); }catch{}
+      try{ window.adsbygoogle=fakeAds; window._adsFake=fakeAds; }catch{}
+    }catch{}
+    try{
+      // 2) intercept XHR/fetch for googlesyndication -> fake 200 (prevents callback true)
+      const oOpen=XMLHttpRequest.prototype.open;
+      const oSend=XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open=function(m,u,...a){ this._chpUrl=typeof u==='string'?u:''; return oOpen.call(this,m,u,...a); };
+      XMLHttpRequest.prototype.send=function(...a){
+        if(this._chpUrl && this._chpUrl.includes('googlesyndication.com/pagead/js/adsbygoogle.js')){
+          try{
+            Object.defineProperty(this,'readyState',{value:4, writable:true, configurable:true});
+            Object.defineProperty(this,'status',{value:200, writable:true, configurable:true});
+            Object.defineProperty(this,'responseText',{value:'/* fake adsbygoogle */ var adsbygoogle={};', writable:true, configurable:true});
+            Object.defineProperty(this,'responseURL',{value:this._chpUrl, writable:true, configurable:true});
+            Object.defineProperty(this,'response',{value:'/* fake */', writable:true, configurable:true});
+          }catch{}
+          setTimeout(()=>{ try{ this.onreadystatechange&&this.onreadystatechange(); }catch{} try{ this.onload&&this.onload(); }catch{} try{ this.dispatchEvent&&this.dispatchEvent(new Event('load')); }catch{} },0);
+          return;
+        }
+        return oSend.apply(this,a);
+      };
+      if(window.fetch){
+        const oFetch=window.fetch;
+        window.fetch=function(inp,init){
+          try{
+            const url=typeof inp==='string'?inp:(inp&&inp.url)||'';
+            if(url && url.includes('googlesyndication.com/pagead/js/adsbygoogle.js')){
+              return Promise.resolve(new Response('/* fake adsbygoogle */', {status:200, headers:{'Content-Type':'text/javascript'}}));
+            }
+          }catch{}
+          return oFetch.call(this,inp,init);
+        };
+      }
+    }catch{}
+    try{
+      // 3) bait spoof: checkMultiple creates div.adsbox/Ad-Container offsetHeight==0 -> spoof to 100
+      const oh=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'offsetHeight');
+      const ch=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'clientHeight');
+      const isBait=el=> el && el.classList && (el.classList.contains('adsbox')||el.classList.contains('adsbygoogle')||el.classList.contains('Ad-Container')||el.classList.contains('ad-slot')||el.classList.contains('ad-placement'));
+      if(oh) Object.defineProperty(HTMLElement.prototype,'offsetHeight',{get(){ if(isBait(this)) return 100; return oh.get.call(this); }, configurable:true});
+      if(ch) Object.defineProperty(HTMLElement.prototype,'clientHeight',{get(){ if(isBait(this)) return 100; return ch.get.call(this); }, configurable:true});
+    }catch{}
+    try{
+      // 4) block znro class from ever being added (site: addClass(modal, ZNRO) + addClass(body, BODYCLS))
+      const cd=Object.getOwnPropertyDescriptor(Element.prototype,'className');
+      if(cd && cd.set){
+        Object.defineProperty(Element.prototype,'className',{get:cd.get,set(v){
+          if(typeof v==='string'){
+            if(v.includes(ZNRO)) v=v.replaceAll(ZNRO,'').replace(/\s+/g,' ').trim();
+            if(v.includes(BODYCLS)) v=v.replaceAll(BODYCLS,'').replace(/\s+/g,' ').trim();
+          }
+          return cd.set.call(this,v);
+        }, configurable:true});
+      }
+      const origAdd=DOMTokenList.prototype.add;
+      DOMTokenList.prototype.add=function(...a){
+        const f=a.filter(x=> x!==ZNRO && x!==BODYCLS);
+        if(!f.length) return;
+        return origAdd.apply(this,f);
+      };
+    }catch{}
     function killChp(){
       try{
         const hasText = document.body && document.body.innerText && document.body.innerText.includes('Ads Blocker Detected');
-        // find ANY element containing the marker text, then hide nearest fixed high-z ancestor
         const all=[...document.querySelectorAll('*')];
         let killed=0;
         for(const el of all){
           const txt=(el.innerText||'').slice(0,600);
           if(!txt.includes('Ads Blocker Detected')) continue;
-          // climb to fixed container
           let cur=el;
           for(let i=0;i<6 && cur; i++){
             const cs=getComputedStyle(cur);
             const zi=parseInt(cs.zIndex||0);
             if(cs.position==='fixed' && zi >= 999999){
               try{ cur.style.setProperty('display','none','important'); cur.style.setProperty('pointer-events','none','important'); }catch{}
-              killed++;
-              break;
+              killed++; break;
             }
-            // also consider the element itself if it's the fixed overlay (even if w small due to earlier kill)
             if(cur===el && cs.position==='fixed' && zi===2147483647){
-              try{ cur.style.setProperty('display','none','important'); }catch{}
-              killed++;
-              break;
+              try{ cur.style.setProperty('display','none','important'); }catch{} killed++; break;
             }
             cur=cur.parentElement;
           }
-          // also hide the text node container itself
           try{ el.style.setProperty('display','none','important'); }catch{}
         }
-        // fallback: if hasText but no exact innerText match (shadow), hide any huge fixed overlay
         if(hasText && !killed){
           for(const el of all){
             const cs=getComputedStyle(el);
@@ -75,25 +133,28 @@
             }
           }
         }
+        // also force-remove znro/body class if somehow added
+        try{
+          const m=document.querySelector('.'+ZNRO); if(m) m.classList.remove(ZNRO);
+          if(document.body.classList.contains(BODYCLS)) document.body.classList.remove(BODYCLS);
+          if(document.body.classList.contains('modal-open')) document.body.classList.remove('modal-open');
+        }catch{}
         if(killed){
           try{ document.body.style.overflow='auto'; document.documentElement.style.overflow='auto'; }catch{}
           try{ document.documentElement.style.removeProperty('overflow'); document.body.style.removeProperty('overflow'); }catch{}
-          try{ document.body.classList.remove('modal-open'); }catch{}
-          // also clear body position fixed that some CHP sets
           try{ if(getComputedStyle(document.body).position==='fixed') document.body.style.position=''; }catch{}
         }
       }catch{}
     }
-    setInterval(killChp, 600);
+    setInterval(killChp, 500);
     document.addEventListener('DOMContentLoaded', killChp);
     try{
       const obs=new MutationObserver(killChp);
       obs.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});
       setTimeout(()=>{ try{obs.disconnect();}catch{} }, 90000);
     }catch{}
-    // also run early after load
-    setTimeout(killChp, 1500);
-    setTimeout(killChp, 3000);
+    setTimeout(killChp, 800);
+    setTimeout(killChp, 2500);
   })();
   const HTTP=/^https?:\/\//i;
   function b64(s){ try{ return atob(s.replace(/-/g,'+').replace(/_/g,'/')) }catch{ return null; } }
