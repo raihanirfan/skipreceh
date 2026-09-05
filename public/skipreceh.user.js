@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.7
+// @version      0.2.8
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -96,11 +96,20 @@
             const j=await r.json().catch(()=>null);
             return j?.data?.getContent||null;
           }
-          for(let i=0;i<6;i++){
+          for(let i=0;i<8;i++){
             const gc=await getContent();
             if(!gc) break;
               if(gc.__typename==="DetailPageTargetData" && gc.url && /^https?:\/\//.test(gc.url)){ location.replace(gc.url); return true; }
             if(gc.__typename==="ContentAccessTaskSet"){
+              const wt=gc.tasks?.find(t=>t.__typename==="WaitTask" && t.status==="IN_PROGRESS");
+              if(wt){
+                const ta={additional_data:{taboola:{user_id:"fallbackUserId",consent_string:"",url:location.href,external_referrer:"",session_id:null}}};
+                const body=JSON.stringify({operationName:"completeTask", variables:{identifier:ident, task_id:wt.id, task_args:ta}, query:qComp});
+                const r=await fetch(GQL,{method:"POST",headers:{"Accept":"application/json","Content-Type":"application/json","cqreferrer":location.href},body});
+                await r.text().catch(()=>{});
+                await new Promise(r=>setTimeout(r,600));
+                continue;
+              }
               const ad=gc.tasks?.find(t=>t.__typename==="AdTask" && t.status==="IN_PROGRESS");
               if(!ad){ await new Promise(r=>setTimeout(r,1200)); continue; }
               const comp=ad.ads?.[0]?.completion_token; const sess=ad.payloadBag?.taboola?.session_id;
