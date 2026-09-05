@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.11
+// @version      0.2.12
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -56,6 +56,13 @@
       try{ obs.observe(document.documentElement,{childList:true,subtree:true}); }catch{}
       setTimeout(()=>{ try{obs.disconnect();}catch{} }, 5000);
     }
+  }
+
+  // cuty.io/cuttty.com — auto click Continue (submit-button) after interstitial
+  if(/cuty\.io|cuttty\.com/i.test(location.hostname)){
+    const tryCuty=()=>{ const b=document.getElementById('submit-button'); if(b && b.offsetParent!==null){ try{ b.click(); return true; }catch{} } const alt=[...document.querySelectorAll('button')].find(x=>x.innerText.trim().toLowerCase()==='continue'); if(alt){ try{ alt.click(); return true;}catch{} } return false; };
+    let c=0; const iv=setInterval(()=>{ if(tryCuty()||c++>20) clearInterval(iv); }, 800);
+    setTimeout(tryCuty, 3500);
   }
 
   // ouo.io/ouo.press — auto click "I'm a human" after 2.5s enable + follow /go
