@@ -75,6 +75,6 @@ export function json(obj,status=200){
   return new Response(JSON.stringify(obj),{status,headers:{"content-type":"application/json","access-control-allow-origin":"*"}});
 }
 export function isShortener(host){
-  return /^(?:bit\.ly|cutt\.ly|rebrand\.ly|rkns\.link|shorter\.me|t\.co|t\.ly|tiny\.cc|tinylink\.onl|tinyurl\.com|shorturl\.at|6x\.work|v\.gd)$/i.test(host.toLowerCase());
+  return /^(?:bit\.ly|cutt\.ly|rebrand\.ly|shorter\.me|t\.co|t\.ly|tiny\.cc|tinylink\.onl|tinyurl\.com|shorturl\.at|6x\.work|v\.gd)$/i.test(host.toLowerCase());
 }
 export const isHttp=s=>HTTP.test((s||"").trim());
