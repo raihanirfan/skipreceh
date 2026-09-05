@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.29
+// @version      0.2.30
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -70,16 +70,16 @@
     }
   }
 
-  // tpi.li / shrinkearn — 15s counter + Turnstile + anti-adblock (root cause: block innerHTML/outerHTML injection)
+  // tpi.li / shrinkearn — 15s counter + Turnstile + anti-adblock (root cause: jQuery replaceWith + turnstile callback)
   if(/tpi\.li|shrinkearn\.com/i.test(location.hostname)){
-    // block site's Adblock replaces: #link-view outerHTML / .box-main innerHTML = adb_detected
     try{
       const ih=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
       const oh=Object.getOwnPropertyDescriptor(Element.prototype,'outerHTML');
       if(ih&&ih.set) Object.defineProperty(Element.prototype,'innerHTML',{get:ih.get,set(v){ if(typeof v==='string'&&(v.includes('adb_detected')||/Please disable Adblock/i.test(v))) return; return ih.set.call(this,v); },configurable:true});
       if(oh&&oh.set) Object.defineProperty(Element.prototype,'outerHTML',{get:oh.get,set(v){ if(typeof v==='string'&&(v.includes('adb_detected')||/Please disable Adblock/i.test(v))) return; return oh.set.call(this,v); },configurable:true});
+      const rw=Object.getOwnPropertyDescriptor(Element.prototype,'replaceWith');
+      if(rw&&rw.value&&!Element.prototype._srPatched){ const orig=rw.value; Element.prototype.replaceWith=function(...a){ const j=a.join(' '); if(typeof j==='string'&&(j.includes('adb_detected')||/Please disable Adblock/i.test(j))) return; return orig.apply(this,a); }; Element.prototype._srPatched=true; }
     }catch{}
-    // spoof banner dimensions before site measures
     try{
       const oH=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'offsetHeight');
       const cH=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'clientHeight');
@@ -107,18 +107,49 @@
     }
     ensureBanner();
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', ensureBanner);
+    function patchJQuery(){
+      try{
+        const jq=window.jQuery||window.$;
+        if(jq&&jq.fn&&jq.fn.replaceWith&&!jq.fn._srPatched){
+          const orig=jq.fn.replaceWith;
+          jq.fn.replaceWith=function(v){ if(typeof v==='string'&&(v.includes('adb_detected')||/Please disable Adblock/i.test(v))) return this; if(this.is('#link-view')&&typeof v==='string'&&/adblock/i.test(v)) return this; return orig.apply(this, arguments); };
+          jq.fn._srPatched=true;
+        }
+      }catch{}
+    }
+    setInterval(patchJQuery, 500);
+    function hookTurnstile(){
+      try{
+        if(window.turnstile&&window.turnstile.render&&!window.turnstile._srPatched){
+          const orig=window.turnstile.render;
+          window.turnstile.render=function(sel, opts){
+            if(opts&&typeof opts.callback==='function'){
+              const ocb=opts.callback;
+              opts.callback=function(...a){
+                const r=ocb.apply(this,a);
+                setTimeout(()=>{
+                  const btn=document.querySelector('#continue, #link-view .btn-captcha');
+                  if(btn&&!btn.disabled) try{ btn.click(); }catch{}
+                  const form=document.querySelector('#link-view');
+                  if(form) try{ form.requestSubmit?form.requestSubmit():form.submit(); }catch{}
+                },350);
+                return r;
+              };
+            }
+            return orig.call(this, sel, opts);
+          };
+          window.turnstile._srPatched=true;
+        }
+      }catch{}
+    }
+    setInterval(hookTurnstile, 500);
     function restoreTpi(){
       try{
-        ensureBanner();
-        // unhide containers site hid
+        ensureBanner(); patchJQuery(); hookTurnstile();
         const lv=document.querySelector('#link-view'); if(lv){ lv.style.display=''; lv.style.visibility=''; lv.hidden=false; }
-        const row=document.querySelector('.box-main .row'); if(row){ row.style.display=''; }
+        const row=document.querySelector('.box-main .row'); if(row) row.style.display='';
         const box=document.querySelector('.box-main'); if(box) box.style.display='';
-        // remove injected adblock alerts, keep form
-        for(const el of document.querySelectorAll('#adb_detected, .alert.alert-danger')){
-          if(/Adblock|disable/i.test(el.textContent)) el.remove();
-        }
-        // if #link-view was wiped (outerHTML replaced), restore by reload of form via fetch once
+        for(const el of document.querySelectorAll('#adb_detected, .alert.alert-danger')){ if(/Adblock|disable/i.test(el.textContent)) el.remove(); }
         if(!document.querySelector('#link-view') && !window._tpiRestored){
           window._tpiRestored=true;
           fetch(location.href,{credentials:'include'}).then(r=>r.text()).then(html=>{
@@ -137,23 +168,47 @@
     }
     setInterval(restoreTpi, 800);
     document.addEventListener('DOMContentLoaded', restoreTpi);
+    function bypassGoLink(){
+      try{
+        const go=document.querySelector('#go-link');
+        if(go&&!go.classList.contains('go-link')){
+          go.classList.add('go-link');
+          if(window.jQuery) window.jQuery(go).trigger('submit');
+          else go.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));
+          // also try direct AJAX fallback: if go has action, fetch
+        }
+        const skip=document.querySelector('.skip-ad a, a.get-link');
+        if(skip&&skip.offsetParent!==null&&skip.getAttribute('href')&&skip.getAttribute('href')!==''){
+          // skip counter: auto click when href ready
+          try{ skip.click(); }catch{}
+          if(/^https?:\/\//.test(skip.href)) location.replace(skip.href);
+        }
+      }catch{}
+    }
+    setInterval(bypassGoLink, 800);
     function tryTpi(){
-      restoreTpi();
+      restoreTpi(); bypassGoLink();
       const btns=[...document.querySelectorAll('a,button')];
       const btn=btns.find(b=>{
         const tx=(b.innerText||b.textContent||'').trim();
         return /^(Get Link|Skip Ad|Continue)$/i.test(tx) && b.offsetParent!==null;
       });
       if(btn){
-        // if Continue disabled (needs captcha), don't force — wait for user solve, then auto
         if(btn.disabled) return false;
         try{ btn.click(); return true; }catch{ return false; }
       }
-      // also try direct form submit if captcha already solved (turnstile filled)
       return false;
     }
-    let tt=0; const tIv=setInterval(()=>{ if(tryTpi()||tt++>90) clearInterval(tIv); }, 900);
-    try{ const obs=new MutationObserver(()=>{ restoreTpi(); tryTpi(); }); obs.observe(document.documentElement,{childList:true,subtree:true}); setTimeout(()=>{ try{obs.disconnect();}catch{} },40000); }catch{}
+    let tt=0; const tIv=setInterval(()=>{ if(tryTpi()||tt++>100) clearInterval(tIv); }, 850);
+    try{
+      const obs=new MutationObserver(()=>{
+        restoreTpi(); bypassGoLink();
+        const btn=document.querySelector('#continue');
+        if(btn&&!btn.disabled) tryTpi();
+      });
+      obs.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','class','style']});
+      setTimeout(()=>{ try{obs.disconnect();}catch{} },60000);
+    }catch{}
   }
 
   // freedl — 60s bypass (GreasyFork 522735) — alive only: freedl.ink, frdl.io/hk/my/by/pw/net/de, fredl.ru/net/de (pruned dead: frdl.to/fi/com/org/co.uk/is, fredl.com/org/co.uk)
