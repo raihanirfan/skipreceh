@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.13
+// @version      0.2.14
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -13,26 +13,62 @@
 // ==/UserScript==
 (function(){
   'use strict';
-  // adblock stealth early — cuty/cuttty bait
+  // adblock stealth early — cuty/cuttty bait + mock ads
   if(/cuty\.io|cuttty\.com/i.test(location.hostname)){
-    try{ Object.defineProperty(window,'canRunAds',{get:()=>true,configurable:true}); window.adsBlocked=false; window.blockAdBlock=false; }catch{}
+    try{ Object.defineProperty(window,'canRunAds',{get:()=>true,configurable:true}); window.adsBlocked=false; window.blockAdBlock=false; window.adsbygoogle={loaded:true}; }catch{}
+    // mock fetch/XHR for ad domains that adblock would block — prevent detection
     try{
-      const s=document.createElement('style'); s.textContent='[id*="adblock"],[class*="adblock"],.adblock{display:none!important}';
+      const origFetch=window.fetch;
+      window.fetch=function(url,opt){
+        if(typeof url==='string' && /adsco\.re|c\.adsco|4dex\.io|adskeeper/i.test(url)){
+          return Promise.resolve(new Response('{}',{status:200,headers:{'content-type':'application/json'}}));
+        }
+        return origFetch.apply(this, arguments);
+      };
+      const origOpen=XMLHttpRequest.prototype.open, origSend=XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open=function(m,u){ this._u=u; return origOpen.apply(this, arguments); };
+      XMLHttpRequest.prototype.send=function(b){
+        if(this._u && /adsco\.re|c\.adsco/i.test(this._u)){
+          Object.defineProperty(this,'readyState',{value:4}); Object.defineProperty(this,'status',{value:200}); Object.defineProperty(this,'responseText',{value:'{}'});
+          this.dispatchEvent(new Event('load')); return;
+        }
+        return origSend.apply(this, arguments);
+      };
+    }catch{}
+    try{
+      const s=document.createElement('style'); s.textContent='[id*="adblock"],[class*="adblock"],.adblock{display:none!important} html,body{overflow:auto!important}';
       const add=()=>{ try{ (document.head||document.documentElement).appendChild(s); }catch{} };
       if(document.head) add(); else document.addEventListener('DOMContentLoaded', add);
     }catch{}
-    // hide overlay Please disable Adblock if already injected
     const hideOverlay=()=>{
       for(const el of document.querySelectorAll('*')){
-        if(el.innerText && el.innerText.includes('Please disable Adblock')){
-          let p=el; for(let i=0;i<4;i++){ if(!p) break; if(p.style){ p.style.display='none'; } p=p.parentElement; }
-          document.body && (document.body.style.overflow='');
+        if(el.innerText && /Please disable Adblock/i.test(el.innerText)){
+          let p=el;
+          for(let i=0;i<6;i++){
+            if(!p) break;
+            try{
+              if(p.style) p.style.display='none';
+              p.setAttribute('style','display:none!important');
+              if(p.classList) p.classList.remove('modal','show','fade');
+            }catch{}
+            p=p.parentElement;
+          }
+          try{ document.documentElement.style.overflow=''; document.body.style.overflow=''; }catch{}
+        }
+      }
+      // also catch modal with that text via innerHTML
+      const html=document.documentElement.innerHTML;
+      if(/Please disable Adblock/i.test(html)){
+        for(const m of document.querySelectorAll('[class*="modal"],[id*="modal"],[class*="overlay"]')){
+          try{ m.style.display='none'; }catch{}
         }
       }
     };
     const obs=new MutationObserver(hideOverlay);
-    try{ obs.observe(document.documentElement,{childList:true,subtree:true}); }catch{}
-    document.addEventListener('DOMContentLoaded', ()=>{ hideOverlay(); setTimeout(()=>{ try{obs.disconnect();}catch{} }, 15000); });
+    try{ obs.observe(document.documentElement,{childList:true,subtree:true,attributes:true}); }catch{}
+    // persist, not disconnect after 15s — keep alive
+    document.addEventListener('DOMContentLoaded', hideOverlay);
+    setInterval(hideOverlay, 1000);
   }
   const HTTP=/^https?:\/\//i;
   function b64(s){ try{ return atob(s.replace(/-/g,'+').replace(/_/g,'/')) }catch{ return null; } }
