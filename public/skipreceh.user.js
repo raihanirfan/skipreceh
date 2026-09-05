@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.6
+// @version      0.2.7
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -60,34 +60,88 @@
 
   // ad-links helpers — work.ink stealth: delay hook agar ads/incentive ke-load dulu, bypass deteksi Extension/VPN overlay
   function hijackFetch(){
-    // linkvertise access: intercept BOTH fetch & XHR getDetailPageContent → graphql completeDetailPageContent → getDetailPageTarget
-    // ponytail: path /access/7257056/... needs last 2 segments, not ^/\\d+/.
+    // linkvertise — modern getContent + completeTask (3 Ads) + legacy getDetailPageContent fallback
     if(/linkvertise\.com|link-to\.net/i.test(location.hostname)){
       const uLV=new URL(location.href); const rvLV=uLV.searchParams.get('r');
       if(rvLV){ try{ const d=atob(decodeURIComponent(rvLV)); if(/^https?:\/\//.test(d)){ location.replace(d); return; } }catch{ } }
-      const doLVBypass=async (access_token)=>{
+      const clickAgree=()=>{
         try{
-          const ut=localStorage.getItem('X-LINKVERTISE-UT');
-          if(!ut || !access_token) return;
+          for(const b of document.querySelectorAll("button")){
+            if(b.innerText.trim().toUpperCase()==="AGREE" && b.offsetParent!==null){ b.click(); return true; }
+          }
+        }catch{}
+        return false;
+      };
+      if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", ()=>setTimeout(clickAgree,800));
+      else setTimeout(clickAgree,800);
+      try{
+        const obs=new MutationObserver(()=>{ if(clickAgree()) obs.disconnect(); });
+        obs.observe(document.documentElement,{childList:true,subtree:true});
+        setTimeout(()=>{ try{obs.disconnect();}catch{} }, 8000);
+      }catch{}
+      async function lvModern(){
+        try{
           const segs=location.pathname.split('/').filter(Boolean);
-          const link_vertise_url=segs[segs.length-1];
-          const user_id=segs[segs.length-2];
-          if(!/^\d+$/.test(user_id) || !link_vertise_url) return;
+          if(segs.length<2) return false;
+          const u=segs[segs.length-1]; const uid=segs[segs.length-2];
+          if(!/^\d+$/.test(uid) || !u) return false;
+          const GQL="https://publisher.linkvertise.com/graphql";
+          const ident={userIdAndUrl:{user_id:uid, url:u}};
+          const qGet="query getContent($identifier: PublicLinkIdentificationInput!, $task_args: TaskArgument) { getContent(input: $identifier, task_args: $task_args) { ... on ContentAccessTaskSet { __typename tasks { __typename id ... on AdTask { __typename id status adIndex adsTotal ads{completion_token} payloadBag{taboola{session_id}} } } } ... on DetailPageTargetData { type url paste __typename } __typename } }";
+          const qComp="mutation completeTask($identifier: PublicLinkIdentificationInput!, $task_id: String!, $task_args: TaskArgument) { completeTask(input: $identifier, task_id: $task_id, task_args: $task_args) { id ... on AdTask { __typename id status } } }";
+          async function getContent(){
+            const body=JSON.stringify({operationName:"getContent", variables:{identifier:ident, task_args:{additional_data:{taboola:{user_id:"fallbackUserId",consent_string:"",url:location.href,external_referrer:"",session_id:null}}}}, query:qGet});
+            const r=await fetch(GQL,{method:"POST",headers:{"Accept":"application/json","Content-Type":"application/json"},body});
+            if(r.status!==200) return null;
+            const j=await r.json().catch(()=>null);
+            return j?.data?.getContent||null;
+          }
+          for(let i=0;i<6;i++){
+            const gc=await getContent();
+            if(!gc) break;
+              if(gc.__typename==="DetailPageTargetData" && gc.url && /^https?:\/\//.test(gc.url)){ location.replace(gc.url); return true; }
+            if(gc.__typename==="ContentAccessTaskSet"){
+              const ad=gc.tasks?.find(t=>t.__typename==="AdTask" && t.status==="IN_PROGRESS");
+              if(!ad){ await new Promise(r=>setTimeout(r,1200)); continue; }
+              const comp=ad.ads?.[0]?.completion_token; const sess=ad.payloadBag?.taboola?.session_id;
+              if(!comp) break;
+              const ta={additional_data:{taboola:{user_id:"fallbackUserId",consent_string:"",url:location.href,external_referrer:"",session_id:sess}}, completion_token: comp};
+              const body2=JSON.stringify({operationName:"completeTask", variables:{identifier:ident, task_id:ad.id, task_args:ta}, query:qComp});
+              const r2=await fetch(GQL,{method:"POST",headers:{"Accept":"application/json","Content-Type":"application/json","cqreferrer":location.href},body:body2});
+              if(r2.status!==200) break;
+              await r2.json().catch(()=>{});
+              await new Promise(r=>setTimeout(r,1400));
+              continue;
+            }
+            break;
+          }
+          const gc2=await getContent();
+          if(gc2?.__typename==="DetailPageTargetData" && gc2.url){ location.replace(gc2.url); return true; }
+          return false;
+        }catch{ return false; }
+      }
+      async function lvLegacy(access_token){
+        try{
+          const segs=location.pathname.split('/').filter(Boolean);
+          const link_vertise_url=segs[segs.length-1]; const user_id=segs[segs.length-2];
+          if(!/^\d+$/.test(user_id) || !link_vertise_url || !access_token) return;
+          const ut=localStorage.getItem('X-LINKVERTISE-UT');
+          if(!ut) return;
           const q1='mutation completeDetailPageContent($linkIdentificationInput: PublicLinkIdentificationInput!, $completeDetailPageContentInput: CompleteDetailPageContentInput!) { completeDetailPageContent(linkIdentificationInput: $linkIdentificationInput completeDetailPageContentInput: $completeDetailPageContentInput) { TARGET __typename } }';
-          const r1=await fetch(`https://publisher.linkvertise.com/graphql?X-Linkvertise-UT=${ut}`,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify({operationName:'completeDetailPageContent',variables:{linkIdentificationInput:{userIdAndUrl:{user_id,url:link_vertise_url}},completeDetailPageContentInput:{access_token}},query:q1})});
+          const r1=await fetch(`https://publisher.linkvertise.com/graphql?X-Linkvertise-UT=${ut}`,{method:"POST",headers:{Accept:"application/json","Content-Type":"application/json"},body:JSON.stringify({operationName:'completeDetailPageContent',variables:{linkIdentificationInput:{userIdAndUrl:{user_id,url:link_vertise_url}},completeDetailPageContentInput:{access_token}},query:q1})});
           if(r1.status!==200) return;
-          const j1=await r1.json();
+          const j1=await r1.json().catch(()=>null);
           const TARGET=j1?.data?.completeDetailPageContent?.TARGET;
           if(!TARGET) return;
           const q2='mutation getDetailPageTarget($linkIdentificationInput: PublicLinkIdentificationInput!, $token: String!) { getDetailPageTarget(linkIdentificationInput: $linkIdentificationInput token: $token) { type url paste __typename } }';
-          const r2=await fetch(`https://publisher.linkvertise.com/graphql?X-Linkvertise-UT=${ut}`,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify({operationName:'getDetailPageTarget',variables:{linkIdentificationInput:{userIdAndUrl:{user_id,url:link_vertise_url}},token:TARGET},query:q2})});
+          const r2=await fetch(`https://publisher.linkvertise.com/graphql?X-Linkvertise-UT=${ut}`,{method:"POST",headers:{Accept:"application/json","Content-Type":"application/json"},body:JSON.stringify({operationName:'getDetailPageTarget',variables:{linkIdentificationInput:{userIdAndUrl:{user_id,url:link_vertise_url}},token:TARGET},query:q2})});
           if(r2.status!==200) return;
-          const j2=await r2.json();
+          const j2=await r2.json().catch(()=>null);
           const url2=j2?.data?.getDetailPageTarget?.url;
           if(url2 && /^https?:\/\//.test(url2)) location.replace(url2);
         }catch{}
-      };
-      // hook fetch
+      }
+      setTimeout(()=>{ lvModern().catch(()=>{}); }, 3500);
       const origFetchLV=window.fetch;
       window.fetch=function(input, init){
         const url=typeof input==='string'?input:input?.url||'';
@@ -95,12 +149,13 @@
         if(typeof url==='string' && url.includes('graphql')){
           p.then(r=>r.clone().json().then(j=>{
             const at=j?.data?.getDetailPageContent?.access_token;
-            if(at) doLVBypass(at);
+            if(at) lvLegacy(at);
+            const gc=j?.data?.getContent;
+            if(gc?.__typename==="DetailPageTargetData" && gc.url) location.replace(gc.url);
           }).catch(()=>{})).catch(()=>{});
         }
         return p;
       };
-      // hook XHR fallback (Angular HttpClient may use XHR)
       const origOpenLV=XMLHttpRequest.prototype.open, origSendLV=XMLHttpRequest.prototype.send;
       XMLHttpRequest.prototype.open=function(m,u){ this._url=u; return origOpenLV.apply(this,arguments); };
       XMLHttpRequest.prototype.send=function(b){
@@ -109,7 +164,7 @@
             if(!this.responseText || this.responseText.indexOf('getDetailPageContent')===-1) return;
             const resp=JSON.parse(this.responseText);
             const at=resp?.data?.getDetailPageContent?.access_token;
-            if(at) doLVBypass(at);
+            if(at) lvLegacy(at);
           }catch{}
         });
         return origSendLV.apply(this,arguments);
@@ -223,6 +278,7 @@
 
   function run(){
     if(/sfl\.gl/i.test(location.hostname)) return;
+    if(/linkvertise\.com|link-to\.net/i.test(location.hostname)) return;
     const h=findHandler();
     if(h && typeof h.start==="function") try{ h.start(); }catch{}
   }
