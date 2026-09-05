@@ -1,6 +1,6 @@
 let finalUrl=null;
 const $=id=>document.getElementById(id);
-const words=["ouo.io","adf.ly","linkvertise","shortest","bit.ly","tinyurl","cutt.ly"];
+const words=["ouo.io","adf.ly","linkvertise.com","shortest","bit.ly","tinyurl","cutt.ly"];
 let wi=0;
 setInterval(()=>{ const e=$("changingText"); if(e) e.textContent=words[wi++%words.length]; }, 2500);
 function setStatus(msg, kind=""){
