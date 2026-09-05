@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.24
+// @version      0.2.25
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -70,8 +70,8 @@
     }
   }
 
-  // frdl.* / fredl.* — FREEdlink 60s countdown bypass (GreasyFork 522735 1:1)
-  if(/frdl\.|fredl\./i.test(location.hostname)){
+  // frdl.* / fredl.* — FREEdlink 60s countdown bypass (GreasyFork 522735 1:1) — frdl/fredl/freedl.ink
+  if(/frdl\.|fredl\.|freedl\./i.test(location.hostname)){
     function tryFrdl(){
       const btn=document.getElementById('downloadbtnfree');
       const cd=document.getElementById('countdown');
