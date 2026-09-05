@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.2
+// @version      0.2.3
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -48,17 +48,65 @@
       if(f){ try{ f.submit(); }catch{} return true; }
       return false;
     };
-    // 1) langsung kalau form sudah ada (rare)
     if(!trySubmit()){
-      // 2) DOMContentLoaded datang duluan dari sfl — kita daftar lebih awal (document-start), jadi fire sebelum setTimeout 10ms
       document.addEventListener('DOMContentLoaded', ()=>{ trySubmit(); });
-      // 3) MutationObserver untuk form yang muncul setelah head parse
       const obs=new MutationObserver(()=>{ if(trySubmit()) try{obs.disconnect();}catch{} });
-      // documentElement ada di document-start
       try{ obs.observe(document.documentElement,{childList:true,subtree:true}); }catch{}
       setTimeout(()=>{ try{obs.disconnect();}catch{} }, 5000);
     }
   }
+
+  // ad-links helpers — run at document-start to intercept early
+  function hijackFetch(){
+    // bstlar: intercept XHR/fetch for tasks → POST link-completed
+    if(/bstlar\.com/i.test(location.hostname)){
+      const origOpen=XMLHttpRequest.prototype.open, origSend=XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open=function(m,u){ this._url=u; return origOpen.apply(this,arguments); };
+      XMLHttpRequest.prototype.send=function(b){
+        this.addEventListener('load', function(){
+          try{
+            if(this.responseText && this.responseText.includes('tasks')){
+              const r=JSON.parse(this.responseText);
+              const getC=n=>('; '+document.cookie).split('; '+n+'=').pop()?.split(';').shift()||'';
+              fetch('https://bstlar.com/api/link-completed',{
+                method:'POST',
+                headers:{'content-type':'application/json','x-xsrf-token':getC('XSRF-TOKEN')},
+                body: JSON.stringify({link_id: r.link.id}),
+                credentials:'include'
+              }).then(x=>x.text()).then(t=>{ try{ if(t.trim().startsWith('http')) location.replace(t.trim()); }catch{} });
+            }
+          }catch{}
+        });
+        return origSend.apply(this,arguments);
+      };
+    }
+    // lootlinks: hook fetch /tc → ws decrypt
+    if(/lootlinks\.co|loot-links\.com|loot-link\.com|linksloot\.net|lootdest/i.test(location.hostname)){
+      // ?r= direct
+      const u=new URL(location.href); const rv=u.searchParams.get('r');
+      if(rv){ try{ location.replace(decodeURIComponent(escape(atob(rv)))); return; }catch{} }
+      const origFetch=window.fetch;
+      window.fetch=function(url,cfg){
+        if(typeof url==='string' && url.includes('/tc')){
+          return origFetch(url,cfg).then(r=>r.clone().json().then(data=>{
+            let urid='', pix='';
+            (Array.isArray(data)?data:[data]).forEach(it=>{ urid=it.urid||urid; pix=it.action_pixel_url||pix; });
+            const tid=(window.TID||''), KEY=(window.KEY||''), ISD=(window.INCENTIVE_SYNCER_DOMAIN||''), ISrv=(window.INCENTIVE_SERVER_DOMAIN||'');
+            if(urid && ISrv && KEY){
+              const ws=new WebSocket(`wss://${urid.substr(-5)%3}.${ISrv}/c?uid=${urid}&cat=54&key=${KEY}`);
+              ws.onopen=()=>setInterval(()=>{ try{ws.send('0')}catch{} },1000);
+              ws.onmessage=e=>{ if(e.data.includes('r:')){ let d=e.data.replace('r:',''); let comb=atob(d), key=comb.slice(0,5), enc=comb.slice(5), out=''; for(let i=0;i<enc.length;i++) out+=String.fromCharCode(enc.charCodeAt(i)^key.charCodeAt(i%5)); try{location.replace(out)}catch{} } };
+              try{ navigator.sendBeacon(`https://${urid.substr(-5)%3}.${ISrv}/st?uid=${urid}&cat=54`); }catch{}
+              if(pix) try{ fetch(pix); }catch{}
+            }
+            return r;
+          }).then(()=>r));
+        }
+        return origFetch(url,cfg);
+      };
+    }
+  }
+  try{ hijackFetch(); }catch{}
 
   const RULES=[];
   function register(rule){ RULES.push(rule); }
@@ -71,8 +119,21 @@
   }
   function findHandler(){ for(const r of RULES) if(matchRule(r.rule)) return r; return null; }
 
+  // linkvertise ?r= (simple param, no graphql yet)
+  register({ rule: /linkvertise\.com|linkvertise\.net|link-to\.net/i, start(){
+    const u=new URL(location.href); const r=u.searchParams.get('r');
+    if(r){ try{ const d=atob(decodeURIComponent(r)); if(/^https?:\/\//.test(d)) return location.replace(d); }catch{} }
+    const p=paramFrom(); if(p) location.replace(p);
+  }});
   register({ rule: /adf\.ly|adfoc\.us|ay\.gy|j\.gs|q\.gs|tinyical|uii\.io/i, start(){ const u=ysmmFrom(document.documentElement.innerHTML); if(u) location.replace(u); } });
-  register({ rule: /safelink/i, start(){ const u=paramFrom(); if(u) location.replace(u); } });
+  // cuty.io & bstlar param also via generic, but bstlar fetch hook handles main flow
+  register({ rule: /cuty\.io|safelink/i, start(){ const u=paramFrom(); if(u) location.replace(u); } });
+  // work.ink: redirect via api fallback + crowd (best effort)
+  register({ rule: /work\.ink/i, start(){
+    if(location.pathname==='/' ) return;
+    // try crowd-like redirect: fetch work.ink api if exposed, else generic param
+    const u=paramFrom(); if(u) location.replace(u);
+  }});
   register({ rule: /./, start(){
     const u=ysmmFrom(document.documentElement.innerHTML) || paramFrom();
     if(!u) return;
@@ -82,7 +143,7 @@
   }});
 
   function run(){
-    if(/sfl\.gl/i.test(location.hostname)) return; // sudah handled di atas
+    if(/sfl\.gl/i.test(location.hostname)) return;
     const h=findHandler();
     if(h && typeof h.start==="function") try{ h.start(); }catch{}
   }
