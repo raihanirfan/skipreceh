@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.17
+// @version      0.2.18
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -109,21 +109,36 @@
     }
   }
 
-  // cuty.io/cuttty.com — auto click Continue (submit-button) after interstitial + vhit enable
+  // cuty.io/cuttty.com — Evade-cut: copy cf-turnstile-response + form.requestSubmit (not raw click)
   if(/cuty\.io|cuttty\.com/i.test(location.hostname)){
-    const tryCuty=()=>{
-      const b=document.getElementById('submit-button');
-      // only click when actually enabled — disabled click is no-op and prematurely clears interval (ponytail bug 0.2.16)
-      if(b && b.offsetParent!==null && !b.disabled && b.innerText.trim().toLowerCase()!=='please wait ...'){
-        try{ b.click(); return true; }catch{}
-      }
-      const alt=[...document.querySelectorAll('button')].find(x=>x.innerText.trim().toLowerCase()==='continue');
-      if(alt && alt.offsetParent!==null && !alt.disabled){ try{ alt.click(); return true; }catch{} }
-      return false;
+    const copyTurnstile=(form)=>{
+      try{
+        let t=form.querySelector('[name="cf-turnstile-response"]');
+        if(t && t.value) return;
+        for(const e of document.querySelectorAll('[name="cf-turnstile-response"]')) if(e.value){
+          if(t) t.value=e.value; else { const c=e.cloneNode(true); c.type='hidden'; form.appendChild(c); }
+          break;
+        }
+      }catch{}
     };
-    let c=0; const iv=setInterval(()=>{ if(tryCuty()||c++>26) clearInterval(iv); }, 800);
+    const tryCuty=()=>{
+      const form=document.getElementById('free-submit-form')||document.querySelector('form');
+      const b=document.getElementById('submit-button')||[...document.querySelectorAll('button')].find(x=>x.innerText.trim().toLowerCase()==='continue');
+      if(!form||!b) return false;
+      if(b.disabled || b.innerText.trim().toLowerCase()==='please wait ...' || b.offsetParent===null) return false;
+      // Evade variant: submit-form[data] needs turnstile value before submit
+      const hasTurnstile=document.querySelector('[name="cf-turnstile-response"]');
+      if(hasTurnstile && !hasTurnstile.value) return false;
+      try{
+        copyTurnstile(form);
+        if(typeof form.requestSubmit==='function') form.requestSubmit(b);
+        else form.submit();
+        return true;
+      }catch{ try{ b.click(); return true; }catch{ return false; } }
+    };
+    let c=0; const iv=setInterval(()=>{ if(tryCuty()||c++>32) clearInterval(iv); }, 700);
     setTimeout(tryCuty, 3500);
-    setTimeout(tryCuty, 6000);
+    setTimeout(tryCuty, 6500);
   }
 
   // ouo.io/ouo.press — auto click "I'm a human" after 2.5s enable + follow /go
