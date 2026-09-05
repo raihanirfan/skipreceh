@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.4
+// @version      0.2.5
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -60,6 +60,42 @@
 
   // ad-links helpers — work.ink stealth: delay hook agar ads/incentive ke-load dulu, bypass deteksi Extension/VPN overlay
   function hijackFetch(){
+    // linkvertise access: intercept getDetailPageContent → graphql completeDetailPageContent → getDetailPageTarget (FastForward port)
+    if(/linkvertise\.com|link-to\.net/i.test(location.hostname)){
+      const uLV=new URL(location.href); const rvLV=uLV.searchParams.get('r');
+      if(rvLV){ try{ const d=atob(decodeURIComponent(rvLV)); if(/^https?:\/\//.test(d)){ location.replace(d); return; } }catch{ } }
+      const origOpenLV=XMLHttpRequest.prototype.open, origSendLV=XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open=function(m,u){ this._url=u; return origOpenLV.apply(this,arguments); };
+      XMLHttpRequest.prototype.send=function(b){
+        this.addEventListener('load', async function(){
+          try{
+            if(!this.responseText || !this.responseText.includes('getDetailPageContent')) return;
+            const resp=JSON.parse(this.responseText);
+            const access_token=resp?.data?.getDetailPageContent?.access_token;
+            if(!access_token) return;
+            const ut=localStorage.getItem('X-LINKVERTISE-UT');
+            if(!ut) return;
+            const lp=location.pathname.replace(/\/[0-9]$/,'');
+            const m=lp.match(/^\/(\d+)\/([\w-]+)$/);
+            if(!m) return;
+            const user_id=m[1], link_vertise_url=m[2];
+            const q1='mutation completeDetailPageContent($linkIdentificationInput: PublicLinkIdentificationInput!, $completeDetailPageContentInput: CompleteDetailPageContentInput!) { completeDetailPageContent(linkIdentificationInput: $linkIdentificationInput completeDetailPageContentInput: $completeDetailPageContentInput) { TARGET __typename } }';
+            const r1=await fetch(`https://publisher.linkvertise.com/graphql?X-Linkvertise-UT=${ut}`,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify({operationName:'completeDetailPageContent',variables:{linkIdentificationInput:{userIdAndUrl:{user_id,url:link_vertise_url}},completeDetailPageContentInput:{access_token}},query:q1})});
+            if(r1.status!==200) return;
+            const j1=await r1.json();
+            const TARGET=j1?.data?.completeDetailPageContent?.TARGET;
+            if(!TARGET) return;
+            const q2='mutation getDetailPageTarget($linkIdentificationInput: PublicLinkIdentificationInput!, $token: String!) { getDetailPageTarget(linkIdentificationInput: $linkIdentificationInput token: $token) { type url paste __typename } }';
+            const r2=await fetch(`https://publisher.linkvertise.com/graphql?X-Linkvertise-UT=${ut}`,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify({operationName:'getDetailPageTarget',variables:{linkIdentificationInput:{userIdAndUrl:{user_id,url:link_vertise_url}},token:TARGET},query:q2})});
+            if(r2.status!==200) return;
+            const j2=await r2.json();
+            const url2=j2?.data?.getDetailPageTarget?.url;
+            if(url2 && /^https?:\/\//.test(url2)) location.replace(url2);
+          }catch{}
+        });
+        return origSendLV.apply(this,arguments);
+      };
+    }
     // bstlar: intercept XHR/fetch for tasks → POST link-completed (delay 1.2s biar deteksi lewat)
     // bstlar: intercept XHR/fetch for tasks → POST link-completed
     if(/bstlar\.com/i.test(location.hostname)){
