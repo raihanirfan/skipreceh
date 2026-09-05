@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.35
+// @version      0.2.36
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -28,6 +28,73 @@
       };
     }catch{}
   }catch{}
+  // ponytail: generic CHP Ads Blocker killer (financeehelp.com etc) — overlay z 2147483647 random id + text "Ads Blocker Detected"
+  // Helium reports no adblock but modal still shows — kill by text + fixed high-z, restore scroll
+  (function(){
+    function killChp(){
+      try{
+        const hasText = document.body && document.body.innerText && document.body.innerText.includes('Ads Blocker Detected');
+        // find ANY element containing the marker text, then hide nearest fixed high-z ancestor
+        const all=[...document.querySelectorAll('*')];
+        let killed=0;
+        for(const el of all){
+          const txt=(el.innerText||'').slice(0,600);
+          if(!txt.includes('Ads Blocker Detected')) continue;
+          // climb to fixed container
+          let cur=el;
+          for(let i=0;i<6 && cur; i++){
+            const cs=getComputedStyle(cur);
+            const zi=parseInt(cs.zIndex||0);
+            if(cs.position==='fixed' && zi >= 999999){
+              try{ cur.style.setProperty('display','none','important'); cur.style.setProperty('pointer-events','none','important'); }catch{}
+              killed++;
+              break;
+            }
+            // also consider the element itself if it's the fixed overlay (even if w small due to earlier kill)
+            if(cur===el && cs.position==='fixed' && zi===2147483647){
+              try{ cur.style.setProperty('display','none','important'); }catch{}
+              killed++;
+              break;
+            }
+            cur=cur.parentElement;
+          }
+          // also hide the text node container itself
+          try{ el.style.setProperty('display','none','important'); }catch{}
+        }
+        // fallback: if hasText but no exact innerText match (shadow), hide any huge fixed overlay
+        if(hasText && !killed){
+          for(const el of all){
+            const cs=getComputedStyle(el);
+            if(cs.display==='none' || cs.visibility==='hidden') continue;
+            if(cs.position!=='fixed') continue;
+            const zi=parseInt(cs.zIndex||0);
+            if(zi < 999999 && zi !== 2147483647) continue;
+            const r=el.getBoundingClientRect();
+            if(r.width >= window.innerWidth*0.5 && r.height >= window.innerHeight*0.4){
+              try{ el.style.setProperty('display','none','important'); el.style.setProperty('pointer-events','none','important'); killed++; }catch{}
+            }
+          }
+        }
+        if(killed){
+          try{ document.body.style.overflow='auto'; document.documentElement.style.overflow='auto'; }catch{}
+          try{ document.documentElement.style.removeProperty('overflow'); document.body.style.removeProperty('overflow'); }catch{}
+          try{ document.body.classList.remove('modal-open'); }catch{}
+          // also clear body position fixed that some CHP sets
+          try{ if(getComputedStyle(document.body).position==='fixed') document.body.style.position=''; }catch{}
+        }
+      }catch{}
+    }
+    setInterval(killChp, 600);
+    document.addEventListener('DOMContentLoaded', killChp);
+    try{
+      const obs=new MutationObserver(killChp);
+      obs.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});
+      setTimeout(()=>{ try{obs.disconnect();}catch{} }, 90000);
+    }catch{}
+    // also run early after load
+    setTimeout(killChp, 1500);
+    setTimeout(killChp, 3000);
+  })();
   const HTTP=/^https?:\/\//i;
   function b64(s){ try{ return atob(s.replace(/-/g,'+').replace(/_/g,'/')) }catch{ return null; } }
   function toUrl(v){
