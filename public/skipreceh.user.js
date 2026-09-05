@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.12
+// @version      0.2.13
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -13,6 +13,27 @@
 // ==/UserScript==
 (function(){
   'use strict';
+  // adblock stealth early — cuty/cuttty bait
+  if(/cuty\.io|cuttty\.com/i.test(location.hostname)){
+    try{ Object.defineProperty(window,'canRunAds',{get:()=>true,configurable:true}); window.adsBlocked=false; window.blockAdBlock=false; }catch{}
+    try{
+      const s=document.createElement('style'); s.textContent='[id*="adblock"],[class*="adblock"],.adblock{display:none!important}';
+      const add=()=>{ try{ (document.head||document.documentElement).appendChild(s); }catch{} };
+      if(document.head) add(); else document.addEventListener('DOMContentLoaded', add);
+    }catch{}
+    // hide overlay Please disable Adblock if already injected
+    const hideOverlay=()=>{
+      for(const el of document.querySelectorAll('*')){
+        if(el.innerText && el.innerText.includes('Please disable Adblock')){
+          let p=el; for(let i=0;i<4;i++){ if(!p) break; if(p.style){ p.style.display='none'; } p=p.parentElement; }
+          document.body && (document.body.style.overflow='');
+        }
+      }
+    };
+    const obs=new MutationObserver(hideOverlay);
+    try{ obs.observe(document.documentElement,{childList:true,subtree:true}); }catch{}
+    document.addEventListener('DOMContentLoaded', ()=>{ hideOverlay(); setTimeout(()=>{ try{obs.disconnect();}catch{} }, 15000); });
+  }
   const HTTP=/^https?:\/\//i;
   function b64(s){ try{ return atob(s.replace(/-/g,'+').replace(/_/g,'/')) }catch{ return null; } }
   function toUrl(v){
