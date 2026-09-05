@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.18
+// @version      0.2.19
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -13,57 +13,6 @@
 // ==/UserScript==
 (function(){
   'use strict';
-  // adblock stealth early — cuty/cuttty bait + mock ads
-  if(/cuty\.io|cuttty\.com/i.test(location.hostname)){
-    try{ Object.defineProperty(window,'canRunAds',{get:()=>true,configurable:true}); window.adsBlocked=false; window.blockAdBlock=false; window.adsbygoogle={loaded:true}; }catch{}
-    // mock fetch/XHR for ad domains that adblock would block — prevent detection
-    try{
-      const origFetch=window.fetch;
-      window.fetch=function(url,opt){
-        if(typeof url==='string' && /adsco\.re|c\.adsco|4dex\.io|adskeeper/i.test(url)){
-          return Promise.resolve(new Response('{}',{status:200,headers:{'content-type':'application/json'}}));
-        }
-        return origFetch.apply(this, arguments);
-      };
-      const origOpen=XMLHttpRequest.prototype.open, origSend=XMLHttpRequest.prototype.send;
-      XMLHttpRequest.prototype.open=function(m,u){ this._u=u; return origOpen.apply(this, arguments); };
-      XMLHttpRequest.prototype.send=function(b){
-        if(this._u && /adsco\.re|c\.adsco/i.test(this._u)){
-          Object.defineProperty(this,'readyState',{value:4}); Object.defineProperty(this,'status',{value:200}); Object.defineProperty(this,'responseText',{value:'{}'});
-          this.dispatchEvent(new Event('load')); return;
-        }
-        return origSend.apply(this, arguments);
-      };
-    }catch{}
-    try{
-      const s=document.createElement('style'); s.textContent='[id*="adblock"],[class*="adblock"],.adblock{display:none!important} html,body{overflow:auto!important}';
-      const add=()=>{ try{ (document.head||document.documentElement).appendChild(s); }catch{} };
-      if(document.head) add(); else document.addEventListener('DOMContentLoaded', add);
-    }catch{}
-    let _hideT=0;
-    const hideOverlay=()=>{
-      if(Date.now()-_hideT<800) return; _hideT=Date.now();
-      // TreeWalker text scan — catches parent divs with children
-      try{
-        const w=document.createTreeWalker(document.body||document.documentElement, NodeFilter.SHOW_TEXT);
-        let n; while(n=w.nextNode()){
-          if(/Please disable Adblock/i.test(n.nodeValue)){
-            let p=n.parentElement;
-            for(let i=0;i<6;i++){ if(!p) break; try{ p.style.display='none'; p.setAttribute('style','display:none!important'); if(p.classList) p.classList.remove('modal','show','fade','overlay'); }catch{} p=p.parentElement; }
-          }
-        }
-      }catch{}
-      for(const m of document.querySelectorAll('[class*="modal"],[id*="modal"],[class*="overlay"],[id*="adblock"]')){
-        try{ if(m.innerText && /Please disable Adblock/i.test(m.innerText)) m.style.display='none'; }catch{}
-      }
-      try{ document.documentElement.style.overflow=''; if(document.body) document.body.style.overflow=''; document.documentElement.style.pointerEvents=''; if(document.body) document.body.style.pointerEvents=''; }catch{}
-    };
-    const obs=new MutationObserver(hideOverlay);
-    try{ obs.observe(document.documentElement,{childList:true,subtree:true}); }catch{}
-    document.addEventListener('DOMContentLoaded', hideOverlay);
-    setInterval(hideOverlay, 1200);
-    // ponytail: TreeWalker + 800ms throttle — add tighter scan when overlay re-injected via shadow
-  }
   const HTTP=/^https?:\/\//i;
   function b64(s){ try{ return atob(s.replace(/-/g,'+').replace(/_/g,'/')) }catch{ return null; } }
   function toUrl(v){
@@ -107,38 +56,6 @@
       try{ obs.observe(document.documentElement,{childList:true,subtree:true}); }catch{}
       setTimeout(()=>{ try{obs.disconnect();}catch{} }, 5000);
     }
-  }
-
-  // cuty.io/cuttty.com — Evade-cut: copy cf-turnstile-response + form.requestSubmit (not raw click)
-  if(/cuty\.io|cuttty\.com/i.test(location.hostname)){
-    const copyTurnstile=(form)=>{
-      try{
-        let t=form.querySelector('[name="cf-turnstile-response"]');
-        if(t && t.value) return;
-        for(const e of document.querySelectorAll('[name="cf-turnstile-response"]')) if(e.value){
-          if(t) t.value=e.value; else { const c=e.cloneNode(true); c.type='hidden'; form.appendChild(c); }
-          break;
-        }
-      }catch{}
-    };
-    const tryCuty=()=>{
-      const form=document.getElementById('free-submit-form')||document.querySelector('form');
-      const b=document.getElementById('submit-button')||[...document.querySelectorAll('button')].find(x=>x.innerText.trim().toLowerCase()==='continue');
-      if(!form||!b) return false;
-      if(b.disabled || b.innerText.trim().toLowerCase()==='please wait ...' || b.offsetParent===null) return false;
-      // Evade variant: submit-form[data] needs turnstile value before submit
-      const hasTurnstile=document.querySelector('[name="cf-turnstile-response"]');
-      if(hasTurnstile && !hasTurnstile.value) return false;
-      try{
-        copyTurnstile(form);
-        if(typeof form.requestSubmit==='function') form.requestSubmit(b);
-        else form.submit();
-        return true;
-      }catch{ try{ b.click(); return true; }catch{ return false; } }
-    };
-    let c=0; const iv=setInterval(()=>{ if(tryCuty()||c++>32) clearInterval(iv); }, 700);
-    setTimeout(tryCuty, 3500);
-    setTimeout(tryCuty, 6500);
   }
 
   // ouo.io/ouo.press — auto click "I'm a human" after 2.5s enable + follow /go
@@ -356,8 +273,8 @@
     const p=paramFrom(); if(p) location.replace(p);
   }});
   register({ rule: /adf\.ly|adfoc\.us|ay\.gy|j\.gs|q\.gs|tinyical|uii\.io/i, start(){ const u=ysmmFrom(document.documentElement.innerHTML); if(u) location.replace(u); } });
-  // cuty.io & bstlar param also via generic, but bstlar fetch hook handles main flow
-  register({ rule: /cuty\.io|safelink/i, start(){ const u=paramFrom(); if(u) location.replace(u); } });
+  // safelink generic
+  register({ rule: /safelink/i, start(){ const u=paramFrom(); if(u) location.replace(u); } });
   // work.ink: stealth — delay hook 1.2s + masquerade toString agar tidak kedetect Extension, retry ws crowd
   register({ rule: /work\.ink/i, start(){
     if(location.pathname==='/' ) return;
