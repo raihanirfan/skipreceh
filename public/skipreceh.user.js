@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.22
+// @version      0.2.23
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -13,6 +13,8 @@
 // ==/UserScript==
 (function(){
   'use strict';
+  // ponytail: block ad pop-up windows — keep location.replace for bypass
+  try{window.open=()=>null;}catch{}
   const HTTP=/^https?:\/\//i;
   function b64(s){ try{ return atob(s.replace(/-/g,'+').replace(/_/g,'/')) }catch{ return null; } }
   function toUrl(v){
