@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.10
+// @version      0.2.11
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -55,6 +55,31 @@
       const obs=new MutationObserver(()=>{ if(trySubmit()) try{obs.disconnect();}catch{} });
       try{ obs.observe(document.documentElement,{childList:true,subtree:true}); }catch{}
       setTimeout(()=>{ try{obs.disconnect();}catch{} }, 5000);
+    }
+  }
+
+  // ouo.io/ouo.press — auto click "I'm a human" after 2.5s enable + follow /go
+  if(/ouo\.io|ouo\.press/i.test(location.hostname)){
+    const tryOuo = ()=>{
+      const btn=document.getElementById('btn-main');
+      if(btn && btn.offsetParent!==null){
+        try{ btn.click(); return true; }catch{ return false; }
+      }
+      return false;
+    };
+    // page has setTimeout 2500 to enable, we poll
+    let tries=0;
+    const iv=setInterval(()=>{
+      if(tryOuo() || tries++>20) clearInterval(iv);
+    }, 600);
+    // also if redirected to /go, click again if needed
+    setTimeout(()=>{ tryOuo(); }, 4000);
+    // if on /go page, auto follow any meta/redirect
+    if(location.pathname.startsWith('/go/')){
+      setTimeout(()=>{
+        const m=document.documentElement.innerHTML.match(/https?:\/\/[^\s"'<>]+/);
+        // let site JS handle, just wait for navigation
+      }, 2000);
     }
   }
 
