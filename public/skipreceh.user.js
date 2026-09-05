@@ -5,6 +5,8 @@
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
+// @updateURL    https://skipreceh.pages.dev/skipreceh.user.js
+// @downloadURL  https://skipreceh.pages.dev/skipreceh.user.js
 // @match        *://*/*
 // @run-at       document-start
 // @grant        none
