@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.26
+// @version      0.2.27
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -68,6 +68,27 @@
         // let site JS handle, just wait for navigation
       }, 2000);
     }
+  }
+
+  // tpi.li / shrinkearn — 15s counter + Turnstile (shrinkearn template) — auto klik Get Link/Skip Ad setelah countdown
+  if(/tpi\.li|shrinkearn\.com/i.test(location.hostname)){
+    function tryTpi(){
+      // hide anti-adblock overlay
+      try{
+        for(const el of document.querySelectorAll('[class*="adblock"],[id*="adblock"]')){
+          if(el.offsetParent!==null) el.style.display='none';
+        }
+      }catch{}
+      const btns=[...document.querySelectorAll('a,button')];
+      const btn=btns.find(b=>{
+        const tx=(b.innerText||b.textContent||'').trim();
+        return /^(Get Link|Skip Ad|Continue)$/i.test(tx) && b.offsetParent!==null && !b.disabled;
+      });
+      if(btn){ try{ btn.click(); return true; }catch{ return false; } }
+      return false;
+    }
+    let tt=0; const tIv=setInterval(()=>{ if(tryTpi()||tt++>60) clearInterval(tIv); }, 1000);
+    try{ const obs=new MutationObserver(()=>tryTpi()); obs.observe(document.documentElement,{childList:true,subtree:true}); setTimeout(()=>{ try{obs.disconnect();}catch{} },30000); }catch{}
   }
 
   // freedl — 60s bypass (GreasyFork 522735) — alive only: freedl.ink, frdl.io/hk/my/by/pw/net/de, fredl.ru/net/de (pruned dead: frdl.to/fi/com/org/co.uk/is, fredl.com/org/co.uk)
