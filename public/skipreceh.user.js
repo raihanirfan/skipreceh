@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.28
+// @version      0.2.29
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -70,50 +70,90 @@
     }
   }
 
-  // tpi.li / shrinkearn — 15s counter + Turnstile + anti-adblock spoof
+  // tpi.li / shrinkearn — 15s counter + Turnstile + anti-adblock (root cause: block innerHTML/outerHTML injection)
   if(/tpi\.li|shrinkearn\.com/i.test(location.hostname)){
-    // anti-adblock: spoof .banner.banner-captcha/.banner-inner so site doesn't replace #link-view
-    function spoofTpi(){
-      try{
-        if(!document.querySelector('.banner.banner-captcha')){
-          const b=document.createElement('div'); b.className='banner banner-captcha'; b.style.cssText='height:100px;display:block;position:absolute;left:-9999px';
-          const inner=document.createElement('div'); inner.className='banner-inner'; inner.style.cssText='width:300px;height:100px;display:block';
-          b.appendChild(inner); (document.body||document.documentElement).appendChild(b);
-        }
-        if(!document.querySelector('.banner-inner')){
-          const bi=document.createElement('div'); bi.className='banner-inner'; bi.style.cssText='width:300px;height:100px;display:block;position:absolute;left:-9999px';
-          (document.body||document.documentElement).appendChild(bi);
-        }
-        const lv=document.querySelector('#link-view'); if(lv) lv.style.display='';
-        const box=document.querySelector('.box-main .row'); if(box) box.style.display='';
-        const adb=document.getElementById('adb_detected'); if(adb) adb.remove();
-        for(const el of document.querySelectorAll('.alert.alert-danger')){ if(/Adblock/i.test(el.textContent)) el.remove(); }
-      }catch{}
-    }
-    spoofTpi();
+    // block site's Adblock replaces: #link-view outerHTML / .box-main innerHTML = adb_detected
+    try{
+      const ih=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
+      const oh=Object.getOwnPropertyDescriptor(Element.prototype,'outerHTML');
+      if(ih&&ih.set) Object.defineProperty(Element.prototype,'innerHTML',{get:ih.get,set(v){ if(typeof v==='string'&&(v.includes('adb_detected')||/Please disable Adblock/i.test(v))) return; return ih.set.call(this,v); },configurable:true});
+      if(oh&&oh.set) Object.defineProperty(Element.prototype,'outerHTML',{get:oh.get,set(v){ if(typeof v==='string'&&(v.includes('adb_detected')||/Please disable Adblock/i.test(v))) return; return oh.set.call(this,v); },configurable:true});
+    }catch{}
+    // spoof banner dimensions before site measures
     try{
       const oH=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'offsetHeight');
       const cH=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'clientHeight');
       const cW=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'clientWidth');
-      const isBan=e=>e&&e.classList&&(e.classList.contains('banner-captcha')||e.classList.contains('banner-inner')||e.classList.contains('ad-banner'));
+      const isBan=e=>e&&e.classList&&(e.classList.contains('banner-captcha')||e.classList.contains('banner-inner')||e.classList.contains('ad-banner')||e.id==='ad-banner');
       if(oH) Object.defineProperty(HTMLElement.prototype,'offsetHeight',{get(){ if(isBan(this)) return 100; return oH.get.call(this); },configurable:true});
       if(cH) Object.defineProperty(HTMLElement.prototype,'clientHeight',{get(){ if(isBan(this)) return 100; return cH.get.call(this); },configurable:true});
       if(cW) Object.defineProperty(HTMLElement.prototype,'clientWidth',{get(){ if(isBan(this)) return 300; return cW.get.call(this); },configurable:true});
     }catch{}
-    document.addEventListener('DOMContentLoaded', spoofTpi);
-    setInterval(spoofTpi, 1000);
+    function ensureBanner(){
+      try{
+        if(!document.querySelector('.banner.banner-captcha')){
+          const b=document.createElement('div'); b.className='banner banner-captcha'; b.style.cssText='height:100px;display:block;position:absolute;left:-9999px;top:0';
+          const inner=document.createElement('div'); inner.className='banner-inner'; inner.style.cssText='width:300px;height:100px;display:block';
+          b.appendChild(inner); (document.body||document.documentElement).appendChild(b);
+        } else if(!document.querySelector('.banner.banner-captcha .banner-inner')){
+          const inner=document.createElement('div'); inner.className='banner-inner'; inner.style.cssText='width:300px;height:100px;display:block';
+          document.querySelector('.banner.banner-captcha').appendChild(inner);
+        }
+        if(!document.getElementById('ad-banner')){
+          const e=document.createElement('div'); e.id='ad-banner'; e.className='ad-banner'; e.style.cssText='height:5px;width:5px;position:absolute;top:0;left:0;display:block';
+          (document.body||document.documentElement).appendChild(e);
+        }
+      }catch{}
+    }
+    ensureBanner();
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', ensureBanner);
+    function restoreTpi(){
+      try{
+        ensureBanner();
+        // unhide containers site hid
+        const lv=document.querySelector('#link-view'); if(lv){ lv.style.display=''; lv.style.visibility=''; lv.hidden=false; }
+        const row=document.querySelector('.box-main .row'); if(row){ row.style.display=''; }
+        const box=document.querySelector('.box-main'); if(box) box.style.display='';
+        // remove injected adblock alerts, keep form
+        for(const el of document.querySelectorAll('#adb_detected, .alert.alert-danger')){
+          if(/Adblock|disable/i.test(el.textContent)) el.remove();
+        }
+        // if #link-view was wiped (outerHTML replaced), restore by reload of form via fetch once
+        if(!document.querySelector('#link-view') && !window._tpiRestored){
+          window._tpiRestored=true;
+          fetch(location.href,{credentials:'include'}).then(r=>r.text()).then(html=>{
+            try{
+              const m=html.match(/<div[^>]*id="link-view"[^>]*>[\s\S]*?<\/form>\s*<\/div>/i);
+              if(m){
+                let host=document.querySelector('.box-main .row')||document.querySelector('.box-main')||document.body;
+                const tmp=document.createElement('div'); tmp.innerHTML=m[0];
+                const fresh=tmp.querySelector('#link-view');
+                if(fresh && !document.querySelector('#link-view')) host.appendChild(fresh);
+              }
+            }catch{}
+          }).catch(()=>{});
+        }
+      }catch{}
+    }
+    setInterval(restoreTpi, 800);
+    document.addEventListener('DOMContentLoaded', restoreTpi);
     function tryTpi(){
-      spoofTpi();
+      restoreTpi();
       const btns=[...document.querySelectorAll('a,button')];
       const btn=btns.find(b=>{
         const tx=(b.innerText||b.textContent||'').trim();
-        return /^(Get Link|Skip Ad|Continue)$/i.test(tx) && b.offsetParent!==null && !b.disabled;
+        return /^(Get Link|Skip Ad|Continue)$/i.test(tx) && b.offsetParent!==null;
       });
-      if(btn){ try{ btn.click(); return true; }catch{ return false; } }
+      if(btn){
+        // if Continue disabled (needs captcha), don't force — wait for user solve, then auto
+        if(btn.disabled) return false;
+        try{ btn.click(); return true; }catch{ return false; }
+      }
+      // also try direct form submit if captcha already solved (turnstile filled)
       return false;
     }
-    let tt=0; const tIv=setInterval(()=>{ if(tryTpi()||tt++>60) clearInterval(tIv); }, 1000);
-    try{ const obs=new MutationObserver(()=>tryTpi()); obs.observe(document.documentElement,{childList:true,subtree:true}); setTimeout(()=>{ try{obs.disconnect();}catch{} },30000); }catch{}
+    let tt=0; const tIv=setInterval(()=>{ if(tryTpi()||tt++>90) clearInterval(tIv); }, 900);
+    try{ const obs=new MutationObserver(()=>{ restoreTpi(); tryTpi(); }); obs.observe(document.documentElement,{childList:true,subtree:true}); setTimeout(()=>{ try{obs.disconnect();}catch{} },40000); }catch{}
   }
 
   // freedl — 60s bypass (GreasyFork 522735) — alive only: freedl.ink, frdl.io/hk/my/by/pw/net/de, fredl.ru/net/de (pruned dead: frdl.to/fi/com/org/co.uk/is, fredl.com/org/co.uk)
