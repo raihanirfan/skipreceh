@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.34
+// @version      0.2.35
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -18,6 +18,15 @@
     const _nullOpen=()=>null;
     try{ Object.defineProperty(window,'open',{value:_nullOpen, writable:false, configurable:true}); }catch{ try{window.open=_nullOpen;}catch{} }
     try{ Object.defineProperty(Window.prototype,'open',{value:_nullOpen, writable:false, configurable:true}); }catch{}
+    // also block anchor _blank hijack early
+    try{
+      const _aClick=HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click=function(){
+        try{ const h=this.href||''; if(this.target==='_blank' && h && !h.includes(location.hostname) && /hai8g|warless|peccary|rvpaste|tpi\.li|shrinkearn|advertisingcamps/i.test(h)==false) return; }catch{}
+        // allow if inside bypass flow
+        return _aClick.apply(this,arguments);
+      };
+    }catch{}
   }catch{}
   const HTTP=/^https?:\/\//i;
   function b64(s){ try{ return atob(s.replace(/-/g,'+').replace(/_/g,'/')) }catch{ return null; } }
@@ -121,20 +130,85 @@
           const oc=btn.getAttribute('onclick')||'';
           if(oc.includes('hai8g')||oc.includes('window.open')) btn.removeAttribute('onclick');
         }
-        for(const a of document.querySelectorAll('a[href*="hai8g.com"]')){
-          try{ a.removeAttribute('target'); a.style.display='none'; }catch{}
+        for(const a of document.querySelectorAll('a[href*="hai8g.com"], a[href*="warlessstarved"], a[href*="peccaryentraps"], a[href*="rvpaste.com"], a[target="_blank"]')){
+          try{
+            const h=a.href||'';
+            // keep same-origin or advertisingcamps (bypass target)
+            if(h.includes('advertisingcamps.com')||h.includes(location.hostname)) continue;
+            a.removeAttribute('target'); a.style.display='none'; a.style.pointerEvents='none';
+          }catch{}
         }
+        // also neutralize go-popup form target
+        try{ const gp=document.getElementById('go-popup'); if(gp) gp.removeAttribute('target'); }catch{}
       }catch{}
     }
-    // capture-phase click blocker for ad anchors (target _blank bypasses window.open)
+    // overlay killer: remove fixed high-z overlay covering captcha (2147483647) and ensure captcha on top
+    function killTpiOverlay(){
+      try{
+        const cap=document.querySelector('#captchaShortlink');
+        if(!cap) return;
+        const cr=cap.getBoundingClientRect();
+        if(cr.width===0&&cr.height===0) return;
+        const cx=cr.left+cr.width/2, cy=cr.top+cr.height/2;
+        for(const el of document.querySelectorAll('div, section, iframe, a')){
+          if(el===cap || cap.contains(el)) continue;
+          const cs=getComputedStyle(el);
+          const zi=parseInt(cs.zIndex||0);
+          if(zi<9999) continue;
+          if(cs.position!=='fixed' && cs.position!=='absolute') continue;
+          const r=el.getBoundingClientRect();
+          if(r.width<50 || r.height<50) continue;
+          // covers captcha center or full viewport
+          const coversCap = cx>=r.left && cx<=r.right && cy>=r.top && cy<=r.bottom;
+          const coversViewport = r.width>=window.innerWidth*0.8 && r.height>=window.innerHeight*0.5;
+          if(coversCap || coversViewport){
+            el.style.setProperty('display','none','important');
+            el.style.setProperty('pointer-events','none','important');
+          }
+        }
+        cap.style.setProperty('position','relative','important');
+        cap.style.setProperty('z-index','2147483647','important');
+        cap.style.setProperty('pointer-events','auto','important');
+        const ifr=cap.querySelector('iframe');
+        if(ifr){ ifr.style.setProperty('pointer-events','auto','important'); ifr.style.setProperty('z-index','2147483647','important'); }
+      }catch{}
+    }
+    // capture-phase click protector: any ad anchor _blank blocked; captcha clicks protected from popunder
     try{
+      const isAdHref=h=>/hai8g|warlessstarved|peccaryentraps|rvpaste|ek\.|sx\./i.test(h);
       document.addEventListener('click', e=>{
-        const a=e.target.closest&&e.target.closest('a[href*="hai8g.com"], a[href*="warlessstarved"], a[href*="peccaryentraps"], a[href*="rvpaste.com"]');
-        if(a){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }
+        const a=e.target.closest&&e.target.closest('a');
+        if(a){
+          const h=a.href||''; const tgt=a.getAttribute('target');
+          if((tgt==='_blank' && h && !h.includes(location.hostname) && !h.includes('advertisingcamps.com')) || isAdHref(h)){
+            e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); return;
+          }
+        }
+        // if click is on/over captcha, block popunder handlers (warless) but let iframe handle
+        try{
+          const cap=document.querySelector('#captchaShortlink');
+          if(cap){
+            const r=cap.getBoundingClientRect();
+            const overCap = e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom;
+            const insideCap = cap.contains(e.target) || (e.target.tagName==='IFRAME' && cap.contains(e.target));
+            if(overCap || insideCap){
+              // block any other document click listeners (popunder) — keep turnstile iframe intact
+              e.stopImmediatePropagation();
+            }
+          }
+        }catch{}
       }, true);
+      // also block auxclick/mousedown popunder variants
+      ['auxclick','mousedown','mouseup'].forEach(ev=>{
+        document.addEventListener(ev, e=>{
+          const a=e.target.closest&&e.target.closest('a[href*="hai8g"], a[href*="warless"], a[href*="peccary"]');
+          if(a){ e.preventDefault(); e.stopImmediatePropagation(); }
+        }, true);
+      });
     }catch{}
     setInterval(stripTpiAds, 400);
-    document.addEventListener('DOMContentLoaded', stripTpiAds);
+    setInterval(killTpiOverlay, 350);
+    document.addEventListener('DOMContentLoaded', ()=>{ stripTpiAds(); killTpiOverlay(); });
     function patchJQuery(){
       try{
         const jq=window.jQuery||window.$;
@@ -225,13 +299,23 @@
         const btn=document.querySelector('#continue');
         const tok=document.querySelector('input[name="cf-turnstile-response"]');
         const hasTok=tok&&tok.value&&tok.value.length>10;
-        if(btn&&!btn.disabled&&hasTok){
-          if(window._tpiSubmitted) return true;
+        if(btn&&hasTok){
+          // force enable (site disables until captcha, but overlay may keep disabled)
+          try{ btn.disabled=false; btn.removeAttribute('disabled'); btn.style.pointerEvents='auto'; }catch{}
+          if(btn.disabled) return false;
+          // dedupe only if already submitted via guard count
+          if(window._tpiSubmitted && window._tpiSubmitCount) return true;
           const oc=btn.getAttribute('onclick')||'';
           if(oc.includes('window.open')||oc.includes('hai8g')){ try{ btn.removeAttribute('onclick'); }catch{} }
           window._tpiSubmitted=true;
           try{ btn.click(); }catch{}
-          setTimeout(()=>{ try{ btn.disabled=true; btn.setAttribute('disabled','disabled'); }catch{} }, 150);
+          // also try direct form submit as fallback (bypass onclick popup)
+          try{
+            const form=btn.closest&&btn.closest('form');
+            if(form && !window._tpiSubmitCount){
+              setTimeout(()=>{ try{ if(!window._tpiSubmitCount) form.requestSubmit ? form.requestSubmit(btn) : form.submit(); }catch{} }, 120);
+            }
+          }catch{}
           return true;
         }
         // also handle Get Link / Skip Ad on other shrinkearn variants (no captcha)
