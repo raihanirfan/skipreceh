@@ -5,7 +5,7 @@ const MAP=[
   {re:/ouo\.io|ouo\.press/i, name:"Ouo.io"},
   {re:/shorte\.st|sh\.st/i, name:"Shorte.st"},
   {re:/linkvertise|link-to\.net/i, name:"Linkvertise"},
-  {re:/work\.ink|bstlar\.com|lootlinks|loot-link|paster\.so/i, name:"AdLink"},
+  {re:/work\.ink|lootlinks|loot-link|paster\.so/i, name:"AdLink"},
   {re:/bit\.ly|cutt\.ly|rebrand\.ly|shorter\.me|t\.ly|tiny\.cc|tinyurl\.com|shorturl\.at/i, name:"Shortener"},
 ];
 export async function onRequestPost({request}){

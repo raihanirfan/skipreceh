@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.20
+// @version      0.2.21
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -187,29 +187,6 @@
           }catch{}
         });
         return origSendLV.apply(this,arguments);
-      };
-    }
-    // bstlar: intercept XHR/fetch for tasks → POST link-completed (delay 1.2s biar deteksi lewat)
-    // bstlar: intercept XHR/fetch for tasks → POST link-completed
-    if(/bstlar\.com/i.test(location.hostname)){
-      const origOpen=XMLHttpRequest.prototype.open, origSend=XMLHttpRequest.prototype.send;
-      XMLHttpRequest.prototype.open=function(m,u){ this._url=u; return origOpen.apply(this,arguments); };
-      XMLHttpRequest.prototype.send=function(b){
-        this.addEventListener('load', function(){
-          try{
-            if(this.responseText && this.responseText.includes('tasks')){
-              const r=JSON.parse(this.responseText);
-              const getC=n=>('; '+document.cookie).split('; '+n+'=').pop()?.split(';').shift()||'';
-              fetch('https://bstlar.com/api/link-completed',{
-                method:'POST',
-                headers:{'content-type':'application/json','x-xsrf-token':getC('XSRF-TOKEN')},
-                body: JSON.stringify({link_id: r.link.id}),
-                credentials:'include'
-              }).then(x=>x.text()).then(t=>{ try{ if(t.trim().startsWith('http')) location.replace(t.trim()); }catch{} });
-            }
-          }catch{}
-        });
-        return origSend.apply(this,arguments);
       };
     }
     // lootlinks: hook fetch /tc → ws decrypt
