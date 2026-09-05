@@ -33,7 +33,7 @@ async function resolve(){
   const t0=Date.now();
   setProgress(35,true);
   try{
-    const r=await fetch("/api/organic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url})});
+    const r=await fetch("/api/bypass",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url})});
     const txt=await r.text();
     let j; try{ j=JSON.parse(txt); }catch{ throw new Error(txt.includes("<!DOCTYPE")||txt.includes("<html") ? "Server diblokir challenge (Cf) — pakai userscript buka link langsung" : (txt.slice(0,120)||"Response bukan JSON")); }
     const sec=((Date.now()-t0)/1000).toFixed(1)+"s";
@@ -41,7 +41,7 @@ async function resolve(){
       finalUrl=j.resolved||j.url; setProgress(100,true);
       setStatus("Bypass berhasil ("+sec+")","ok");
       $("svc").textContent=svc;
-      $("finalUrl").textContent=finalUrl; $("elapsed").textContent=sec+" • organic • "+(j.steps||1)+" steps";
+      $("finalUrl").textContent=finalUrl; $("elapsed").textContent=sec+" • bypass • "+(j.steps||1)+" steps";
       const a=$("openLink"); a.href=finalUrl; a.textContent="Buka tujuan ↗";
       $("result").classList.add("show");
     } else {
