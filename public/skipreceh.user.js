@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.15
+// @version      0.2.16
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -42,25 +42,27 @@
     }catch{}
     let _hideT=0;
     const hideOverlay=()=>{
-      if(Date.now()-_hideT<1500) return; _hideT=Date.now();
-      const bodyText=document.body ? document.body.innerText : '';
-      if(!/Please disable Adblock/i.test(bodyText) && !/Please disable Adblock/i.test(document.documentElement.innerHTML.slice(0,5000))) return;
-      for(const m of document.querySelectorAll('[class*="modal"],[id*="modal"],[class*="overlay"],[id*="adblock"],[class*="adblock"]')){
-        try{ m.style.display='none'; m.setAttribute('style','display:none!important'); }catch{}
-      }
-      for(const el of document.querySelectorAll('*')){
-        if(el.childNodes.length>0) continue; // only leaf text nodes
-        if(el.textContent && /Please disable Adblock/i.test(el.textContent)){
-          let p=el;
-          for(let i=0;i<5;i++){ if(!p) break; try{ p.style.display='none'; }catch{} p=p.parentElement; }
+      if(Date.now()-_hideT<800) return; _hideT=Date.now();
+      // TreeWalker text scan — catches parent divs with children
+      try{
+        const w=document.createTreeWalker(document.body||document.documentElement, NodeFilter.SHOW_TEXT);
+        let n; while(n=w.nextNode()){
+          if(/Please disable Adblock/i.test(n.nodeValue)){
+            let p=n.parentElement;
+            for(let i=0;i<6;i++){ if(!p) break; try{ p.style.display='none'; p.setAttribute('style','display:none!important'); if(p.classList) p.classList.remove('modal','show','fade','overlay'); }catch{} p=p.parentElement; }
+          }
         }
+      }catch{}
+      for(const m of document.querySelectorAll('[class*="modal"],[id*="modal"],[class*="overlay"],[id*="adblock"]')){
+        try{ if(m.innerText && /Please disable Adblock/i.test(m.innerText)) m.style.display='none'; }catch{}
       }
-      try{ document.documentElement.style.overflow=''; if(document.body) document.body.style.overflow=''; }catch{}
+      try{ document.documentElement.style.overflow=''; if(document.body) document.body.style.overflow=''; document.documentElement.style.pointerEvents=''; if(document.body) document.body.style.pointerEvents=''; }catch{}
     };
-    const obs=new MutationObserver(()=>{ hideOverlay(); });
+    const obs=new MutationObserver(hideOverlay);
     try{ obs.observe(document.documentElement,{childList:true,subtree:true}); }catch{}
     document.addEventListener('DOMContentLoaded', hideOverlay);
-    // ponytail: 1.5s throttle, leaf-only scan — add when still jank on huge DOM
+    setInterval(hideOverlay, 1200);
+    // ponytail: TreeWalker + 800ms throttle — add tighter scan when overlay re-injected via shadow
   }
   const HTTP=/^https?:\/\//i;
   function b64(s){ try{ return atob(s.replace(/-/g,'+').replace(/_/g,'/')) }catch{ return null; } }
