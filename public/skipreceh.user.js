@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.30
+// @version      0.2.31
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -70,8 +70,9 @@
     }
   }
 
-  // tpi.li / shrinkearn — 15s counter + Turnstile + anti-adblock (root cause: jQuery replaceWith + turnstile callback)
+  // tpi.li / shrinkearn — anti-adblock + stuck after captcha (root cause: jQuery replaceWith outerHTML + turnstile callback not auto-submitting)
   if(/tpi\.li|shrinkearn\.com/i.test(location.hostname)){
+    // run before site checks (load event)
     try{
       const ih=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
       const oh=Object.getOwnPropertyDescriptor(Element.prototype,'outerHTML');
@@ -117,39 +118,70 @@
         }
       }catch{}
     }
-    setInterval(patchJQuery, 500);
+    setInterval(patchJQuery, 400);
+    // hook turnstile before first render: poll until window.turnstile exists
+    let _tpiHooked=false;
     function hookTurnstile(){
       try{
-        if(window.turnstile&&window.turnstile.render&&!window.turnstile._srPatched){
-          const orig=window.turnstile.render;
-          window.turnstile.render=function(sel, opts){
-            if(opts&&typeof opts.callback==='function'){
-              const ocb=opts.callback;
-              opts.callback=function(...a){
-                const r=ocb.apply(this,a);
-                setTimeout(()=>{
-                  const btn=document.querySelector('#continue, #link-view .btn-captcha');
-                  if(btn&&!btn.disabled) try{ btn.click(); }catch{}
-                  const form=document.querySelector('#link-view');
-                  if(form) try{ form.requestSubmit?form.requestSubmit():form.submit(); }catch{}
-                },350);
-                return r;
-              };
-            }
-            return orig.call(this, sel, opts);
+        const ts=window.turnstile;
+        if(!ts||!ts.render||_tpiHooked) return;
+        const orig=ts.render;
+        ts.render=function(sel, opts){
+          const origCb=opts&&opts.callback;
+          const wrappedCb=function(...a){
+            let r; if(typeof origCb==='function') try{ r=origCb.apply(this,a); }catch{}
+            // auto-continue 300ms after site enables button, only if token present
+            setTimeout(()=>{ tryAutoSubmit('turnstile-cb'); }, 320);
+            return r;
           };
-          window.turnstile._srPatched=true;
-        }
+          if(opts) opts.callback=wrappedCb;
+          // also handle expired/error callbacks to re-enable hook
+          return orig.call(this, sel, opts);
+        };
+        _tpiHooked=true;
+        ts._srPatched=true;
       }catch{}
     }
-    setInterval(hookTurnstile, 500);
+    // poll quickly before site's onloadTurnstileCallback fires (site loads turnstile async)
+    const _hookIv=setInterval(()=>{ hookTurnstile(); if(_tpiHooked) clearInterval(_hookIv); }, 120);
+    // fallback: if turnstile already rendered, hook future renders via MutationObserver on token input
+    function tryAutoSubmit(src){
+      try{
+        const btn=document.querySelector('#continue');
+        const tok=document.querySelector('input[name="cf-turnstile-response"]');
+        const hasTok=tok&&tok.value&&tok.value.length>10;
+        // only submit when captcha solved (btn enabled + token present)
+        if(btn&&!btn.disabled&&hasTok){
+          // avoid double submit
+          if(window._tpiSubmitted) return true;
+          window._tpiSubmitted=true;
+          // suppress popup window.open for Continue's onclick
+          const oc=btn.getAttribute('onclick')||'';
+          if(oc.includes('window.open')){ try{ btn.removeAttribute('onclick'); }catch{} }
+          // click + form submit fallback
+          try{ btn.click(); }catch{}
+          // ponytail: click submits #link-view → advertisingcamps; no explicit requestSubmit (causes duplicate POST)
+          return true;
+        }
+        // also handle Get Link / Skip Ad on other shrinkearn variants (no captcha)
+        if(!hasTok){
+          const altBtn=[...document.querySelectorAll('a,button')].find(b=>{
+            const tx=(b.innerText||b.textContent||'').trim();
+            return /^(Get Link|Skip Ad)$/i.test(tx) && b.offsetParent!==null && !b.disabled;
+          });
+          if(altBtn){ altBtn.click(); return true; }
+        }
+      }catch{}
+      return false;
+    }
     function restoreTpi(){
       try{
-        ensureBanner(); patchJQuery(); hookTurnstile();
+        ensureBanner(); patchJQuery();
         const lv=document.querySelector('#link-view'); if(lv){ lv.style.display=''; lv.style.visibility=''; lv.hidden=false; }
         const row=document.querySelector('.box-main .row'); if(row) row.style.display='';
         const box=document.querySelector('.box-main'); if(box) box.style.display='';
-        for(const el of document.querySelectorAll('#adb_detected, .alert.alert-danger')){ if(/Adblock|disable/i.test(el.textContent)) el.remove(); }
+        for(const el of document.querySelectorAll('#adb_detected')) el.remove();
+        for(const el of document.querySelectorAll('.alert.alert-danger')){ if(/Adblock|disable/i.test(el.textContent)) el.remove(); }
         if(!document.querySelector('#link-view') && !window._tpiRestored){
           window._tpiRestored=true;
           fetch(location.href,{credentials:'include'}).then(r=>r.text()).then(html=>{
@@ -166,49 +198,25 @@
         }
       }catch{}
     }
-    setInterval(restoreTpi, 800);
+    setInterval(restoreTpi, 700);
     document.addEventListener('DOMContentLoaded', restoreTpi);
-    function bypassGoLink(){
-      try{
-        const go=document.querySelector('#go-link');
-        if(go&&!go.classList.contains('go-link')){
-          go.classList.add('go-link');
-          if(window.jQuery) window.jQuery(go).trigger('submit');
-          else go.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));
-          // also try direct AJAX fallback: if go has action, fetch
-        }
-        const skip=document.querySelector('.skip-ad a, a.get-link');
-        if(skip&&skip.offsetParent!==null&&skip.getAttribute('href')&&skip.getAttribute('href')!==''){
-          // skip counter: auto click when href ready
-          try{ skip.click(); }catch{}
-          if(/^https?:\/\//.test(skip.href)) location.replace(skip.href);
-        }
-      }catch{}
-    }
-    setInterval(bypassGoLink, 800);
-    function tryTpi(){
-      restoreTpi(); bypassGoLink();
-      const btns=[...document.querySelectorAll('a,button')];
-      const btn=btns.find(b=>{
-        const tx=(b.innerText||b.textContent||'').trim();
-        return /^(Get Link|Skip Ad|Continue)$/i.test(tx) && b.offsetParent!==null;
-      });
-      if(btn){
-        if(btn.disabled) return false;
-        try{ btn.click(); return true; }catch{ return false; }
-      }
-      return false;
-    }
-    let tt=0; const tIv=setInterval(()=>{ if(tryTpi()||tt++>100) clearInterval(tIv); }, 850);
+    // poll for solved captcha (button enabled + token) — this is what fixes stuck after click
+    setInterval(()=>tryAutoSubmit('poll'), 700);
+    // immediate on any DOM change (token input filled, disabled removed)
     try{
-      const obs=new MutationObserver(()=>{
-        restoreTpi(); bypassGoLink();
-        const btn=document.querySelector('#continue');
-        if(btn&&!btn.disabled) tryTpi();
-      });
-      obs.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','class','style']});
-      setTimeout(()=>{ try{obs.disconnect();}catch{} },60000);
+      const obs=new MutationObserver(()=>{ restoreTpi(); tryAutoSubmit('mut'); });
+      obs.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','class','style','value']});
+      setTimeout(()=>{ try{obs.disconnect();}catch{} },90000);
     }catch{}
+    // also watch token input value via interval (turnstile fills hidden input without attribute change)
+    let _lastTok='';
+    setInterval(()=>{
+      try{
+        const tok=document.querySelector('input[name="cf-turnstile-response"]');
+        const v=tok?tok.value:'';
+        if(v&&v!==_lastTok&&v.length>10){ _lastTok=v; tryAutoSubmit('token-change'); }
+      }catch{}
+    }, 500);
   }
 
   // freedl — 60s bypass (GreasyFork 522735) — alive only: freedl.ink, frdl.io/hk/my/by/pw/net/de, fredl.ru/net/de (pruned dead: frdl.to/fi/com/org/co.uk/is, fredl.com/org/co.uk)
