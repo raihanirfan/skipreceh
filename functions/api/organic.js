@@ -1,6 +1,7 @@
 import { UA, isPrivate, isHttp, json, ysmmFrom, metaRefreshFrom, paramFrom, formAutoUrl, isShortener } from "../_shared/extractors.js";
 
 export async function onRequestPost({request}){
+  try{
   let body; try{ body=await request.json(); }catch{ return json({success:false, error:"json"},400); }
   const src=(body.url||"").trim();
   if(!isHttp(src)) return json({success:false, error:"url harus http(s)"},400);
@@ -80,6 +81,7 @@ export async function onRequestPost({request}){
 
   // no match → butuh browser asli
   return json({success:false, error:"Link ini butuh klik/timer di browser — server tidak bisa bypass.", code:"NEEDS_BROWSER", hint:"Install userscript lalu buka link aslinya, bypass jalan otomatis."});
+  }catch(e){ return json({success:false, error:"Server error: "+(e?.message||e), code:"SERVER_ERROR"},500); }
 }
 export async function onRequestGet({request}){
   const url=(new URL(request.url).searchParams.get("url")||"").trim();
