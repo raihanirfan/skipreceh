@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.8
+// @version      0.2.9
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -87,8 +87,8 @@
           if(!/^\d+$/.test(uid) || !u) return false;
           const GQL="https://publisher.linkvertise.com/graphql";
           const ident={userIdAndUrl:{user_id:uid, url:u}};
-          const qGet="query getContent($identifier: PublicLinkIdentificationInput!, $task_args: TaskArgument) { getContent(input: $identifier, task_args: $task_args) { ... on ContentAccessTaskSet { __typename tasks { __typename id ... on AdTask { __typename id status adIndex adsTotal ads{completion_token} payloadBag{taboola{session_id}} } } } ... on DetailPageTargetData { type url paste __typename } __typename } }";
-          const qComp="mutation completeTask($identifier: PublicLinkIdentificationInput!, $task_id: String!, $task_args: TaskArgument) { completeTask(input: $identifier, task_id: $task_id, task_args: $task_args) { id ... on AdTask { __typename id status } } }";
+          const qGet="query getContent($identifier: PublicLinkIdentificationInput!, $task_args: TaskArgument) { getContent(input: $identifier, task_args: $task_args) { ... on ContentAccessTaskSet { __typename tasks { __typename id ... on PremiumTask { __typename status id } ... on WaitTask { __typename id remainingWaitingTime status adsTotal } ... on AdTask { __typename id status adIndex adsTotal ads{completion_token} payloadBag{taboola{session_id}} } } } ... on DetailPageTargetData { type url paste __typename } __typename } }";
+          const qComp="mutation completeTask($identifier: PublicLinkIdentificationInput!, $task_id: String!, $task_args: TaskArgument) { completeTask(input: $identifier, task_id: $task_id, task_args: $task_args) { id ... on AdTask { __typename id status } ... on WaitTask { __typename id status remainingWaitingTime adsTotal } ... on PremiumTask { __typename status id } } }";
           async function getContent(){
             const body=JSON.stringify({operationName:"getContent", variables:{identifier:ident, task_args:{additional_data:{taboola:{user_id:"fallbackUserId",consent_string:"",url:location.href,external_referrer:"",session_id:null}}}}, query:qGet});
             const r=await fetch(GQL,{method:"POST",headers:{"Accept":"application/json","Content-Type":"application/json"},body});
