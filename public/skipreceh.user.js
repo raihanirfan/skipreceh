@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.23
+// @version      0.2.24
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -68,6 +68,32 @@
         // let site JS handle, just wait for navigation
       }, 2000);
     }
+  }
+
+  // frdl.* / fredl.* — FREEdlink 60s countdown bypass (GreasyFork 522735 1:1)
+  if(/frdl\.|fredl\./i.test(location.hostname)){
+    function tryFrdl(){
+      const btn=document.getElementById('downloadbtnfree');
+      const cd=document.getElementById('countdown');
+      const cap=document.getElementById('free-captcha');
+      const inp=document.getElementById('download_free');
+      if(btn&&cd&&cap&&inp){
+        try{ inp.value='1'; }catch{}
+        try{ cd.style.display='none'; cap.style.display='block'; }catch{}
+        try{ btn.disabled=false; btn.innerText='Start Download NOW (after captcha)'; }catch{}
+        if(!document.getElementById('userscript_message')){
+          const m=document.createElement('p'); m.id='userscript_message'; m.style.color='green'; m.style.textAlign='center';
+          m.innerText='Userscript active: Complete captcha then click Start Download NOW';
+          try{ cap.after(m); }catch{}
+        }
+        return true;
+      }
+      return false;
+    }
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', tryFrdl);
+    window.addEventListener('load', tryFrdl);
+    let fTries=0; const fIv=setInterval(()=>{ if(tryFrdl()||fTries++>30) clearInterval(fIv); }, 500);
+    try{ const obs=new MutationObserver(()=>{ if(tryFrdl()) obs.disconnect(); }); obs.observe(document.documentElement,{childList:true,subtree:true}); setTimeout(()=>{ try{obs.disconnect();}catch{} },15000); }catch{}
   }
 
   // ad-links helpers — work.ink stealth: delay hook agar ads/incentive ke-load dulu, bypass deteksi Extension/VPN overlay
