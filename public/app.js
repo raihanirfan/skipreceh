@@ -34,7 +34,8 @@ async function resolve(){
   setProgress(35,true);
   try{
     const r=await fetch("/api/organic",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url})});
-    let j; try{ j=await r.json(); }catch{ const txt=await r.text().catch(()=>""); throw new Error(txt && txt.includes("<!DOCTYPE") ? "Server diblokir challenge (Cf) — pakai userscript buka link langsung" : (txt||"Response bukan JSON")); }
+    const txt=await r.text();
+    let j; try{ j=JSON.parse(txt); }catch{ throw new Error(txt.includes("<!DOCTYPE")||txt.includes("<html") ? "Server diblokir challenge (Cf) — pakai userscript buka link langsung" : (txt.slice(0,120)||"Response bukan JSON")); }
     const sec=((Date.now()-t0)/1000).toFixed(1)+"s";
     if(j.success){
       finalUrl=j.resolved||j.url; setProgress(100,true);
