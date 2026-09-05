@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.31
+// @version      0.2.34
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -14,7 +14,11 @@
 (function(){
   'use strict';
   // ponytail: block ad pop-up windows — keep location.replace for bypass
-  try{window.open=()=>null;}catch{}
+  try{
+    const _nullOpen=()=>null;
+    try{ Object.defineProperty(window,'open',{value:_nullOpen, writable:false, configurable:true}); }catch{ try{window.open=_nullOpen;}catch{} }
+    try{ Object.defineProperty(Window.prototype,'open',{value:_nullOpen, writable:false, configurable:true}); }catch{}
+  }catch{}
   const HTTP=/^https?:\/\//i;
   function b64(s){ try{ return atob(s.replace(/-/g,'+').replace(/_/g,'/')) }catch{ return null; } }
   function toUrl(v){
@@ -85,7 +89,8 @@
       const oH=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'offsetHeight');
       const cH=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'clientHeight');
       const cW=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'clientWidth');
-      const isBan=e=>e&&e.classList&&(e.classList.contains('banner-captcha')||e.classList.contains('banner-inner')||e.classList.contains('ad-banner')||e.id==='ad-banner');
+      const isAdFake=e=>e&&e.classList&&(e.classList.contains('textads')||e.classList.contains('banner-ads')||e.classList.contains('banner_ads')||e.classList.contains('ad-unit')||e.classList.contains('ad-zone')||e.classList.contains('ad-space')||e.classList.contains('adsbox'));
+      const isBan=e=>e&&e.classList&&(e.classList.contains('banner-captcha')||e.classList.contains('banner-inner')||e.classList.contains('ad-banner')||e.id==='ad-banner'|| isAdFake(e));
       if(oH) Object.defineProperty(HTMLElement.prototype,'offsetHeight',{get(){ if(isBan(this)) return 100; return oH.get.call(this); },configurable:true});
       if(cH) Object.defineProperty(HTMLElement.prototype,'clientHeight',{get(){ if(isBan(this)) return 100; return cH.get.call(this); },configurable:true});
       if(cW) Object.defineProperty(HTMLElement.prototype,'clientWidth',{get(){ if(isBan(this)) return 300; return cW.get.call(this); },configurable:true});
@@ -108,6 +113,28 @@
     }
     ensureBanner();
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', ensureBanner);
+    // strip ad pop-up: button onclick hai8g + banner <a target=_blank> (root cause: new tab even when window.open nulled)
+    function stripTpiAds(){
+      try{
+        const btn=document.querySelector('#continue');
+        if(btn){
+          const oc=btn.getAttribute('onclick')||'';
+          if(oc.includes('hai8g')||oc.includes('window.open')) btn.removeAttribute('onclick');
+        }
+        for(const a of document.querySelectorAll('a[href*="hai8g.com"]')){
+          try{ a.removeAttribute('target'); a.style.display='none'; }catch{}
+        }
+      }catch{}
+    }
+    // capture-phase click blocker for ad anchors (target _blank bypasses window.open)
+    try{
+      document.addEventListener('click', e=>{
+        const a=e.target.closest&&e.target.closest('a[href*="hai8g.com"], a[href*="warlessstarved"], a[href*="peccaryentraps"], a[href*="rvpaste.com"]');
+        if(a){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }
+      }, true);
+    }catch{}
+    setInterval(stripTpiAds, 400);
+    document.addEventListener('DOMContentLoaded', stripTpiAds);
     function patchJQuery(){
       try{
         const jq=window.jQuery||window.$;
@@ -145,22 +172,66 @@
     // poll quickly before site's onloadTurnstileCallback fires (site loads turnstile async)
     const _hookIv=setInterval(()=>{ hookTurnstile(); if(_tpiHooked) clearInterval(_hookIv); }, 120);
     // fallback: if turnstile already rendered, hook future renders via MutationObserver on token input
+    function attachTpiGuard(){
+      try{
+        const _form=document.querySelector('#link-view form')||document.querySelector('#link-view');
+        const _f=_form&&(_form.tagName==='FORM'?_form:_form.querySelector('form'));
+        if(!_f||_f._srGuard) return;
+        _f.addEventListener('submit', e=>{
+          const tok=document.querySelector('input[name="cf-turnstile-response"]');
+          const hasTok=tok&&tok.value&&tok.value.length>10;
+          if(!hasTok){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); return; }
+          if(window._tpiSubmitted){
+            if(window._tpiSubmitCount){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); return; }
+            window._tpiSubmitCount=1;
+          }
+        }, true);
+        _f._srGuard=true;
+        // also neutralize go_popup ad popup if present
+        try{
+          const jq=window.jQuery||window.$;
+          if(jq){
+            jq(document).off('click.adLinkFly.goPopupClick');
+            const gp=jq('#go-popup');
+            if(gp.length) gp.off('submit.adLinkFly.goPopupSubmit').removeAttr('target');
+          }
+        }catch{}
+      }catch{}
+    }
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', attachTpiGuard);
+    else attachTpiGuard();
+    setInterval(attachTpiGuard, 800);
+    // ensure captcha never hidden by ad logic or our own hide
+    function ensureCaptchaVisible(){
+      try{
+        const cap=document.querySelector('#captchaShortlink');
+        if(cap){ cap.style.display='inline-block'; cap.style.visibility='visible'; cap.hidden=false; }
+        const lv=document.querySelector('#link-view');
+        if(lv){ lv.style.display=''; lv.style.visibility=''; }
+      }catch{}
+    }
+    setInterval(ensureCaptchaVisible, 700);
+    document.addEventListener('DOMContentLoaded', ensureCaptchaVisible);
+    // hard block any form targeting Popup_Window (second popup vector)
+    try{
+      document.addEventListener('submit', e=>{
+        const f=e.target;
+        if(f && f.target==='Popup_Window'){ f.target='_self'; }
+        if(f && f.id==='go-popup'){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }
+      }, true);
+    }catch{}
     function tryAutoSubmit(src){
       try{
         const btn=document.querySelector('#continue');
         const tok=document.querySelector('input[name="cf-turnstile-response"]');
         const hasTok=tok&&tok.value&&tok.value.length>10;
-        // only submit when captcha solved (btn enabled + token present)
         if(btn&&!btn.disabled&&hasTok){
-          // avoid double submit
           if(window._tpiSubmitted) return true;
-          window._tpiSubmitted=true;
-          // suppress popup window.open for Continue's onclick
           const oc=btn.getAttribute('onclick')||'';
-          if(oc.includes('window.open')){ try{ btn.removeAttribute('onclick'); }catch{} }
-          // click + form submit fallback
+          if(oc.includes('window.open')||oc.includes('hai8g')){ try{ btn.removeAttribute('onclick'); }catch{} }
+          window._tpiSubmitted=true;
           try{ btn.click(); }catch{}
-          // ponytail: click submits #link-view → advertisingcamps; no explicit requestSubmit (causes duplicate POST)
+          setTimeout(()=>{ try{ btn.disabled=true; btn.setAttribute('disabled','disabled'); }catch{} }, 150);
           return true;
         }
         // also handle Get Link / Skip Ad on other shrinkearn variants (no captcha)
