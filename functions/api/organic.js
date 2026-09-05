@@ -55,7 +55,7 @@ export async function onRequestPost({request}){
         }
         for(let i=0;i<8;i++){
           const gc=await getContent(); if(!gc) break;
-          if(gc.__typename==="DetailPageTargetData" && gc.url && isHttp(gc.url)) return json({success:true,resolved:gc.url,url:gc.url,service:"linkvertise",steps:4});
+          if(gc.__typename==="DetailPageTargetData"){ if(gc.url && isHttp(gc.url)) return json({success:true,resolved:gc.url,url:gc.url,service:"linkvertise",steps:4}); if(gc.paste) return json({success:true,resolved:gc.paste,url:gc.paste,service:"linkvertise-paste",steps:4}); }
           if(gc.__typename==="ContentAccessTaskSet"){
             const wt=gc.tasks?.find(t=>t.__typename==="WaitTask" && t.status==="IN_PROGRESS");
             if(wt){
@@ -73,7 +73,7 @@ export async function onRequestPost({request}){
           } else break;
         }
         const gc2=await getContent();
-        if(gc2?.__typename==="DetailPageTargetData" && gc2.url && isHttp(gc2.url)) return json({success:true,resolved:gc2.url,url:gc2.url,service:"linkvertise",steps:4});
+        if(gc2?.__typename==="DetailPageTargetData"){ if(gc2.url && isHttp(gc2.url)) return json({success:true,resolved:gc2.url,url:gc2.url,service:"linkvertise",steps:4}); if(gc2.paste) return json({success:true,resolved:gc2.paste,url:gc2.paste,service:"linkvertise-paste",steps:4}); }
       }
     }catch{}
   }

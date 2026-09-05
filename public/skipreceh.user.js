@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.9
+// @version      0.2.10
 // @description  Lewati shortlink & safelink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -99,7 +99,7 @@
           for(let i=0;i<8;i++){
             const gc=await getContent();
             if(!gc) break;
-              if(gc.__typename==="DetailPageTargetData" && gc.url && /^https?:\/\//.test(gc.url)){ location.replace(gc.url); return true; }
+              if(gc.__typename==="DetailPageTargetData"){ if(gc.url && /^https?:\/\//.test(gc.url)){ location.replace(gc.url); return true; } if(gc.paste){ document.open(); document.write(gc.paste); document.close(); return true; } }
             if(gc.__typename==="ContentAccessTaskSet"){
               const wt=gc.tasks?.find(t=>t.__typename==="WaitTask" && t.status==="IN_PROGRESS");
               if(wt){
@@ -125,7 +125,7 @@
             break;
           }
           const gc2=await getContent();
-          if(gc2?.__typename==="DetailPageTargetData" && gc2.url){ location.replace(gc2.url); return true; }
+          if(gc2?.__typename==="DetailPageTargetData"){ if(gc2.url){ location.replace(gc2.url); return true; } if(gc2.paste){ document.open(); document.write(gc2.paste); document.close(); return true; } }
           return false;
         }catch{ return false; }
       }
