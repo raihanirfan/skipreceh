@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.21
+// @version      0.2.22
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -187,31 +187,6 @@
           }catch{}
         });
         return origSendLV.apply(this,arguments);
-      };
-    }
-    // lootlinks: hook fetch /tc → ws decrypt
-    if(/lootlinks\.co|loot-links\.com|loot-link\.com|linksloot\.net|lootdest/i.test(location.hostname)){
-      // ?r= direct
-      const u=new URL(location.href); const rv=u.searchParams.get('r');
-      if(rv){ try{ location.replace(decodeURIComponent(escape(atob(rv)))); return; }catch{} }
-      const origFetch=window.fetch;
-      window.fetch=function(url,cfg){
-        if(typeof url==='string' && url.includes('/tc')){
-          return origFetch(url,cfg).then(r=>r.clone().json().then(data=>{
-            let urid='', pix='';
-            (Array.isArray(data)?data:[data]).forEach(it=>{ urid=it.urid||urid; pix=it.action_pixel_url||pix; });
-            const tid=(window.TID||''), KEY=(window.KEY||''), ISD=(window.INCENTIVE_SYNCER_DOMAIN||''), ISrv=(window.INCENTIVE_SERVER_DOMAIN||'');
-            if(urid && ISrv && KEY){
-              const ws=new WebSocket(`wss://${urid.substr(-5)%3}.${ISrv}/c?uid=${urid}&cat=54&key=${KEY}`);
-              ws.onopen=()=>setInterval(()=>{ try{ws.send('0')}catch{} },1000);
-              ws.onmessage=e=>{ if(e.data.includes('r:')){ let d=e.data.replace('r:',''); let comb=atob(d), key=comb.slice(0,5), enc=comb.slice(5), out=''; for(let i=0;i<enc.length;i++) out+=String.fromCharCode(enc.charCodeAt(i)^key.charCodeAt(i%5)); try{location.replace(out)}catch{} } };
-              try{ navigator.sendBeacon(`https://${urid.substr(-5)%3}.${ISrv}/st?uid=${urid}&cat=54`); }catch{}
-              if(pix) try{ fetch(pix); }catch{}
-            }
-            return r;
-          }).then(()=>r));
-        }
-        return origFetch(url,cfg);
       };
     }
   }
