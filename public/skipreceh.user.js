@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.38
+// @version      0.2.39
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -71,18 +71,47 @@
     setTimeout(killWpcp, 900);
     setTimeout(killWpcp, 2600);
   }catch{}
-  // ponytail: financeehelp.com 15s bypass — auto-click startButton/getmylink if markup exists (currently missing)
+  // ponytail: financeehelp.com 15s bypass — fstatic engine injects p.getmylink async (Continue...)
   if(/financeehelp\.com/i.test(location.hostname)){
-    setInterval(()=>{
+    const fh=()=>{
       try{
-        const sb=document.getElementById('startButton');
-        if(sb && sb.offsetParent!==null && getComputedStyle(sb).display!=='none') try{ sb.click(); }catch{}
-        for(const id of ['getmylink','getnewlink','wp2continue']){
-          const el=document.getElementById(id);
-          if(el && !el._srClicked && el.offsetParent!==null && getComputedStyle(el).display!=='none'){ el._srClicked=true; try{ el.click(); }catch{} }
+        const sb=document.getElementById('startButton')||document.querySelector('.startButton');
+        if(sb && !sb._srClicked && sb.offsetParent!==null && getComputedStyle(sb).display!=='none'){ sb._srClicked=true; try{ sb.click(); }catch{} }
+        const trySel=sel=>{
+          for(const el of document.querySelectorAll(sel)){
+            if(el._srClicked) continue;
+            const cs=getComputedStyle(el);
+            if(cs.display==='none' || el.offsetParent===null) continue;
+            const a=el.tagName==='A'?el:el.querySelector('a');
+            const href=(a&&a.href)||el.href||'';
+            if(href && /^https?:\/\//i.test(href) && href!==location.href){ el._srClicked=true; try{ location.href=href; }catch{ try{ (a||el).click(); }catch{} } return true; }
+            if(/Continue/i.test((el.innerText||el.textContent||'').trim())){ el._srClicked=true; try{ (a||el).click(); }catch{} return true; }
+          }
+          return false;
+        };
+        if(trySel('.getmylink, #getmylink, p.getmylink')) return;
+        if(trySel('.getnewlink, #getnewlink')) return;
+        if(trySel('#wp2continue, .wp2continue, .wp2continuelink')) return;
+        for(const el of document.querySelectorAll('a,p,button')){
+          if(el._srClicked) continue;
+          const txt=(el.innerText||el.textContent||'').trim();
+          if(!/^Continue\.?\.?\.?$/i.test(txt)) continue;
+          if(el.offsetParent===null || getComputedStyle(el).display==='none') continue;
+          const a=el.tagName==='A'?el:el.querySelector('a');
+          const href=(a&&a.href)||el.href||'';
+          if(href && /^https?:\/\//i.test(href) && href!==location.href){ el._srClicked=true; location.href=href; return; }
+          el._srClicked=true; try{ (a||el).click(); }catch{}
         }
       }catch{}
-    }, 800);
+    };
+    setInterval(fh, 700);
+    try{
+      const obs=new MutationObserver(fh);
+      obs.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});
+      setTimeout(()=>{ try{obs.disconnect();}catch{} },120000);
+    }catch{}
+    setTimeout(fh, 900);
+    setTimeout(fh, 2500);
   }
   // ponytail: CHP Ads Blocker preempt+kill (financeehelp.com etc) — fake adsbygoogle + bait offsetHeight + block znro class + text fallback
   (function(){
