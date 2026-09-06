@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.40
+// @version      0.2.41
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -514,8 +514,9 @@
         const hasTok=tok&&tok.value&&tok.value.length>10;
         if(btn&&hasTok){
           // force enable — site uses jQuery attr, so clear both DOM and jQuery
-          try{ btn.disabled=false; btn.removeAttribute('disabled'); btn.style.pointerEvents='auto'; }catch{}
+          try{ btn.disabled=false; btn.removeAttribute('disabled'); btn.style.pointerEvents='auto'; btn.style.opacity=''; }catch{}
           try{ const jq=window.jQuery||window.$; if(jq) jq(btn).removeAttr('disabled').prop('disabled',false); }catch{}
+          try{ btn.disabled=false; }catch{}
           // ponytail: don't bail if still reported disabled — force click anyway after 1 tick
           // dedupe only if already submitted via guard count
           if(window._tpiSubmitted && window._tpiSubmitCount) return true;
@@ -523,11 +524,13 @@
           if(oc.includes('window.open')||oc.includes('hai8g')){ try{ btn.removeAttribute('onclick'); }catch{} }
           window._tpiSubmitted=true;
           try{ btn.click(); }catch{}
+          try{ btn.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true})); }catch{}
           // also try direct form submit as fallback (bypass onclick popup)
           try{
             const form=btn.closest&&btn.closest('form');
             if(form && !window._tpiSubmitCount){
-              setTimeout(()=>{ try{ if(!window._tpiSubmitCount) form.requestSubmit ? form.requestSubmit(btn) : form.submit(); }catch{} }, 120);
+              setTimeout(()=>{ try{ if(!window._tpiSubmitCount) form.requestSubmit ? form.requestSubmit(btn) : form.submit(); }catch{} }, 80);
+              setTimeout(()=>{ try{ if(!window._tpiSubmitCount) form.submit(); }catch{} }, 220);
             }
           }catch{}
           return true;
@@ -569,8 +572,18 @@
     }
     setInterval(restoreTpi, 700);
     document.addEventListener('DOMContentLoaded', restoreTpi);
+    // expose for token setter hook
+    try{ window.tryAutoSubmit=tryAutoSubmit; }catch{}
+    // token value setter trap — turnstile sets .value directly, not attribute
+    try{
+      const vd=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+      if(vd && vd.set && !HTMLInputElement.prototype._srTrap){
+        Object.defineProperty(HTMLInputElement.prototype,'value',{get:vd.get,set(v){ const r=vd.set.call(this,v); try{ if(this.name==='cf-turnstile-response' && v && String(v).length>10){ setTimeout(()=>{ try{ window.tryAutoSubmit&&window.tryAutoSubmit('value-set'); }catch{} }, 150); } }catch{} return r; }, configurable:true});
+        HTMLInputElement.prototype._srTrap=true;
+      }
+    }catch{}
     // poll for solved captcha (button enabled + token) — this is what fixes stuck after click
-    setInterval(()=>tryAutoSubmit('poll'), 700);
+    setInterval(()=>tryAutoSubmit('poll'), 500);
     // immediate on any DOM change (token input filled, disabled removed)
     try{
       const obs=new MutationObserver(()=>{ restoreTpi(); tryAutoSubmit('mut'); });
@@ -585,7 +598,7 @@
         const v=tok?tok.value:'';
         if(v&&v!==_lastTok&&v.length>10){ _lastTok=v; tryAutoSubmit('token-change'); }
       }catch{}
-    }, 500);
+    }, 350);
   }
 
   // freedl — 60s bypass (GreasyFork 522735) — alive only: freedl.ink, frdl.io/hk/my/by/pw/net/de, fredl.ru/net/de (pruned dead: frdl.to/fi/com/org/co.uk/is, fredl.com/org/co.uk)
