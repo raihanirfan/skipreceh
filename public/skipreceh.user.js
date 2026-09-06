@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.39
+// @version      0.2.40
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -513,9 +513,10 @@
         const tok=document.querySelector('input[name="cf-turnstile-response"]');
         const hasTok=tok&&tok.value&&tok.value.length>10;
         if(btn&&hasTok){
-          // force enable (site disables until captcha, but overlay may keep disabled)
+          // force enable — site uses jQuery attr, so clear both DOM and jQuery
           try{ btn.disabled=false; btn.removeAttribute('disabled'); btn.style.pointerEvents='auto'; }catch{}
-          if(btn.disabled) return false;
+          try{ const jq=window.jQuery||window.$; if(jq) jq(btn).removeAttr('disabled').prop('disabled',false); }catch{}
+          // ponytail: don't bail if still reported disabled — force click anyway after 1 tick
           // dedupe only if already submitted via guard count
           if(window._tpiSubmitted && window._tpiSubmitCount) return true;
           const oc=btn.getAttribute('onclick')||'';
