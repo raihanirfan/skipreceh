@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.43
+// @version      0.2.44
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -13,7 +13,7 @@
 // ==/UserScript==
 (function(){
   'use strict';
-  try{window._skipreceh='0.2.43';}catch{}
+  try{window._skipreceh='0.2.44';}catch{}
   // ponytail: block ad pop-up windows — keep location.replace for bypass
   try{
     const _nullOpen=()=>null;
@@ -74,10 +74,14 @@
   }catch{}
   // ponytail: financeehelp.com 15s bypass — fstatic engine injects p.getmylink async (Continue...)
   if(/financeehelp\.com/i.test(location.hostname)){
+    // ponytail: accelerate site 15s countdown (setInterval 1000 -> 80ms); hook must run at document-start before inline timer script
+    try{
+      if(!window._srSiPatched){ const oSI=window.setInterval.bind(window); window.setInterval=function(fn,ms,...a){ try{ if(ms===1000) ms=80; }catch{} return oSI(fn,ms,...a); }; window._srSiPatched=true; }
+    }catch{}
     const fh=()=>{
       try{
         const sb=document.getElementById('startButton')||document.querySelector('.startButton');
-        if(sb && !sb._srClicked && sb.offsetParent!==null && getComputedStyle(sb).display!=='none'){ sb._srClicked=true; try{ sb.click(); }catch{} }
+        if(sb && !sb._srClicked && sb.offsetParent!==null && getComputedStyle(sb).display!=='none'){ sb._srClicked=true; try{console.info('[skipreceh] fh startButton click');}catch{} try{ sb.click(); }catch{} }
         const trySel=sel=>{
           for(const el of document.querySelectorAll(sel)){
             if(el._srClicked) continue;
@@ -86,7 +90,7 @@
             const a=el.tagName==='A'?el:el.querySelector('a');
             const href=(a&&a.href)||el.href||'';
             if(href && /^https?:\/\//i.test(href) && href!==location.href){ el._srClicked=true; try{ location.href=href; }catch{ try{ (a||el).click(); }catch{} } return true; }
-            if(/Continue/i.test((el.innerText||el.textContent||'').trim())){ el._srClicked=true; try{ (a||el).click(); }catch{} return true; }
+            if(/Continue/i.test((el.innerText||el.textContent||'').trim())){ el._srClicked=true; try{console.info('[skipreceh] fh auto-click Continue');}catch{} try{ (a||el).click(); }catch{} return true; }
           }
           return false;
         };
