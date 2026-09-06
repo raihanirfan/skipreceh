@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.41
+// @version      0.2.42
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -509,6 +509,7 @@
     }catch{}
     function tryAutoSubmit(src){
       try{
+        try{console.info('[skipreceh] tryAutoSubmit:'+src);}catch{}
         const btn=document.querySelector('#continue');
         const tok=document.querySelector('input[name="cf-turnstile-response"]');
         const hasTok=tok&&tok.value&&tok.value.length>10;
@@ -523,6 +524,7 @@
           const oc=btn.getAttribute('onclick')||'';
           if(oc.includes('window.open')||oc.includes('hai8g')){ try{ btn.removeAttribute('onclick'); }catch{} }
           window._tpiSubmitted=true;
+          try{console.info('[skipreceh] auto-click Continue');}catch{}
           try{ btn.click(); }catch{}
           try{ btn.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true})); }catch{}
           // also try direct form submit as fallback (bypass onclick popup)
