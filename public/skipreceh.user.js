@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SkipReceh
 // @namespace    skipreceh
-// @version      0.2.37
+// @version      0.2.38
 // @description  Lewati shortlink receh.
 // @author       kamu
 // @homepageURL  https://skipreceh.pages.dev
@@ -28,6 +28,62 @@
       };
     }catch{}
   }catch{}
+  // ponytail: WPCP copy-protect killer — restore right-click (financeehelp etc)
+  try{
+    const isWpcp=()=>{ try{ return document.documentElement.innerHTML.includes('wpcp_disable') || document.getElementById('wpcp_disable_selection'); }catch{ return false; } };
+    function killWpcp(){
+      try{
+        if(!isWpcp()) return;
+        try{ document.oncontextmenu=null; document.onselectstart=null; document.ondragstart=null; document.onmousedown=null; }catch{}
+        try{ window.oncontextmenu=null; window.onselectstart=null; }catch{}
+        try{ if(document.body) document.body.removeAttribute('unselectable'); }catch{}
+        try{
+          const s=document.getElementById('wpcp-error-message'); if(s) s.style.display='none';
+        }catch{}
+        try{
+          if(document.body){
+            document.body.style.setProperty('user-select','text','important');
+            document.body.style.setProperty('-webkit-user-select','text','important');
+            document.body.style.setProperty('-moz-user-select','text','important');
+            document.body.style.removeProperty('cursor');
+            document.body.style.setProperty('cursor','auto','important');
+          }
+          document.documentElement.style.setProperty('user-select','text','important');
+        }catch{}
+        // undo MozUserSelect none set by disableSelection()
+        try{
+          const all=document.querySelectorAll('body *');
+          for(const el of all){
+            try{ if(el.style.MozUserSelect==='none') el.style.MozUserSelect='text'; }catch{}
+            try{ if(el.style.userSelect==='none') el.style.userSelect='text'; }catch{}
+            try{ if(el.style.webkitUserSelect==='none') el.style.webkitUserSelect='text'; }catch{}
+          }
+        }catch{}
+      }catch{}
+    }
+    // capture-phase: keep contextmenu/selectstart from being cancelled by WPCP's return false
+    try{
+      document.addEventListener('contextmenu', e=>{ if(isWpcp()){ e.stopImmediatePropagation(); } }, true);
+      document.addEventListener('selectstart', e=>{ if(isWpcp()){ e.stopImmediatePropagation(); } }, true);
+    }catch{}
+    setInterval(killWpcp, 600);
+    document.addEventListener('DOMContentLoaded', killWpcp);
+    setTimeout(killWpcp, 900);
+    setTimeout(killWpcp, 2600);
+  }catch{}
+  // ponytail: financeehelp.com 15s bypass — auto-click startButton/getmylink if markup exists (currently missing)
+  if(/financeehelp\.com/i.test(location.hostname)){
+    setInterval(()=>{
+      try{
+        const sb=document.getElementById('startButton');
+        if(sb && sb.offsetParent!==null && getComputedStyle(sb).display!=='none') try{ sb.click(); }catch{}
+        for(const id of ['getmylink','getnewlink','wp2continue']){
+          const el=document.getElementById(id);
+          if(el && !el._srClicked && el.offsetParent!==null && getComputedStyle(el).display!=='none'){ el._srClicked=true; try{ el.click(); }catch{} }
+        }
+      }catch{}
+    }, 800);
+  }
   // ponytail: CHP Ads Blocker preempt+kill (financeehelp.com etc) — fake adsbygoogle + bait offsetHeight + block znro class + text fallback
   (function(){
     const ZNRO='znrozeohzeoxncqteqklkvkd_cnxjtcestfjovyaujwdftehod';
